@@ -55,8 +55,9 @@ export function MonthView(props: MonthViewProps) {
     return Array.from({ length: 7 }, (_, i) => WEEKDAY_LETTERS[addDays(first, i).getDay()]);
   }, [weekStartsOn]);
 
-  const pagerLeft = useCallback(() => props.onChangeMonth(-1), [props]);
-  const pagerRight = useCallback(() => props.onChangeMonth(1), [props]);
+  // Swipe left = next month (matches Day/Year views and the pager animation).
+  const pagerLeft = useCallback(() => props.onChangeMonth(1), [props]);
+  const pagerRight = useCallback(() => props.onChangeMonth(-1), [props]);
 
   return (
     <View style={{ flex: 1 }}>

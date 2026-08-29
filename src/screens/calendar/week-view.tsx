@@ -25,8 +25,9 @@ export function WeekView(props: WeekViewProps) {
   );
   const occMap = useOccurrences(dates[0], dates[6]);
 
-  const left = useCallback(() => props.onChangeWeek(-1), [props]);
-  const right = useCallback(() => props.onChangeWeek(1), [props]);
+  // Swipe left = next week (matches Day/Year views and the pager animation).
+  const left = useCallback(() => props.onChangeWeek(1), [props]);
+  const right = useCallback(() => props.onChangeWeek(-1), [props]);
 
   return (
     <SwipePager onSwipeLeft={left} onSwipeRight={right} style={{ flex: 1 }}>

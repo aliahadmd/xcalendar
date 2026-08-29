@@ -76,6 +76,29 @@ export interface OccurrenceWindow {
 }
 
 /**
+ * rrule matches for the window. The end anchor is 23:59 of the end date:
+ * anchoring at midnight would drop every timed occurrence on the last day
+ * (Day view passes startDate === endDate, so recurring events would vanish).
+ */
+function ruleMatches(rule: RRule, window: OccurrenceWindow): Date[] {
+  const winStart = parseLocalDate(window.startDate);
+  const winEnd = parseLocalDate(window.endDate);
+  const utcStart = utcAnchorFromLocal(winStart);
+  const utcEnd = utcAnchor(
+    winEnd.getFullYear(),
+    winEnd.getMonth(),
+    winEnd.getDate(),
+    23,
+    59,
+  );
+  try {
+    return rule.between(utcStart, utcEnd, true, () => true);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Expand events into per-day occurrences for [window.startDate, window.endDate].
  * Multi-day all-day events yield one occurrence per covered day.
  */
@@ -85,8 +108,6 @@ export function buildOccurrences(
 ): Map<string, Occurrence[]> {
   const byDate = new Map<string, Occurrence[]>();
   const today = todayStr();
-  const winStart = parseLocalDate(window.startDate);
-  const winEnd = parseLocalDate(window.endDate);
 
   const push = (occ: Occurrence) => {
     const arr = byDate.get(occ.date);
@@ -98,11 +119,35 @@ export function buildOccurrences(
     if (event.type === "task") {
       // Tasks land on their due date.
       if (!event.dtstartDate) continue;
+      // Recurring tasks (imported VTODOs — the form doesn't create them):
+      // one occurrence per due date. Completion is series-level, and a
+      // recurring task is never "overdue" — it simply recurs.
+      if (event.recurrence) {
+        if (event.completedAt) continue;
+        const rule = rruleWithDtstart(event);
+        if (!rule) continue;
+        const matches = ruleMatches(rule, window);
+        for (const m of matches.slice(0, MAX_OCCURRENCES)) {
+          const d = toLocalDateStr(fromUtcAnchor(m));
+          const s = parseLocalDate(d);
+          push({
+            instanceId: `${event.id}#${d}`,
+            event,
+            date: d,
+            start: s,
+            end: s,
+            isAllDay: true,
+            isStart: true,
+            spanDays: 1,
+          });
+        }
+        continue;
+      }
       if (event.dtstartDate > window.endDate) continue;
       // Past-due uncompleted tasks still expand (Today shows them as overdue).
       const due = event.dtstartDate;
       if (due < window.startDate) {
-        if (event.completedAt || event.recurrence) continue;
+        if (event.completedAt) continue;
       }
       const start = parseLocalDate(due);
       push({
@@ -140,15 +185,7 @@ export function buildOccurrences(
     if (event.recurrence) {
       const rule = rruleWithDtstart(event);
       if (!rule) continue;
-      const utcWindowStart = utcAnchorFromLocal(winStart);
-      const utcWindowEnd = utcAnchorFromLocal(winEnd);
-      let matches: Date[];
-      try {
-        matches = rule.between(utcWindowStart, utcWindowEnd, true, () => true);
-      } catch {
-        continue;
-      }
-      matches = matches.slice(0, MAX_OCCURRENCES);
+      const matches = ruleMatches(rule, window).slice(0, MAX_OCCURRENCES);
       for (const m of matches) {
         const localStart = fromUtcAnchor(m);
         const date = toLocalDateStr(localStart);

@@ -15,6 +15,13 @@ interface FireItem {
   kind: "reminder" | "countdown";
 }
 
+/** All-day reminders anchor at 9:00 local (like countdowns) — never midnight. */
+function at9am(date: string): number {
+  const d = parseLocalDate(date);
+  d.setHours(9, 0, 0, 0);
+  return d.getTime();
+}
+
 function buildFireItems(events: CalendarEvent[]): FireItem[] {
   const now = Date.now();
   const windowEnd = now + WINDOW_DAYS * 86400000;
@@ -48,8 +55,12 @@ function buildFireItems(events: CalendarEvent[]): FireItem[] {
         continue;
       }
       if (event.type === "task" && event.completedAt) continue;
+      // One reminder set per instance: continuation days of a multi-day span
+      // must not each fire their own alarm.
+      if (!occ.isStart) continue;
       for (const minutes of event.reminders) {
-        const fireAt = occ.start.getTime() - minutes * 60000;
+        const base = occ.isAllDay ? at9am(occ.date) : occ.start.getTime();
+        const fireAt = base - minutes * 60000;
         if (fireAt <= now || fireAt > windowEnd) continue;
         const timeLabel = occ.isAllDay ? "All-day event" : "";
         items.push({
@@ -87,7 +98,9 @@ export async function rescheduleAll(): Promise<void> {
     }));
     // Skip no-op reschedules — saving settings after scheduling would re-trigger
     // the data-changed listeners and loop forever.
-    const signature = alarms.map((a) => a.id).join("|");
+    // Signature covers content too: editing an event's title/body must re-arm
+    // its alarms, not just moving its times.
+    const signature = JSON.stringify(alarms);
     if (signature === lastSignature) return;
     lastSignature = signature;
     await XCalendarAlarm.scheduleAlarms(alarms);

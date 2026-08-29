@@ -211,7 +211,8 @@ class XCalendarAlarmModule : Module() {
                 .put("title", "🔔 XCalendar test alarm")
                 .put("body", "If you see this full-screen, reminders are bulletproof.")
                 .put("kind", "reminder")
-            XAlarmScheduler.replaceAll(context, listOf(alarm))
+            // addAlarm, NOT replaceAll — the test must never wipe the real pending set.
+            XAlarmScheduler.addAlarm(context, alarm)
             android.util.Log.d("XCalendarAlarm", "test alarm scheduled at $fireAt")
             return@Function fireAt
         }

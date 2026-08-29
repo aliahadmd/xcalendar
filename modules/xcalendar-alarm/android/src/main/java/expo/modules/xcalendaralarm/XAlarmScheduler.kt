@@ -100,15 +100,22 @@ object XAlarmScheduler {
 
     fun snooze(context: Context, title: String, body: String, kind: String, minutes: Int) {
         val fireAt = System.currentTimeMillis() + minutes * 60_000L
-        val id = "snooze-$fireAt"
         val alarm = JSONObject()
-            .put("id", id)
+            .put("id", "snooze-$fireAt")
             .put("fireAt", fireAt)
             .put("title", title)
             .put("body", body)
             .put("kind", kind)
+        addAlarm(context, alarm)
+    }
+
+    /**
+     * Schedule one extra alarm on top of the pending set — used by snooze and the
+     * test alarm. Unlike [replaceAll] it never cancels the alarms already armed.
+     */
+    fun addAlarm(context: Context, alarm: JSONObject) {
         scheduleOne(context, alarm)
-        // Add to pending so it survives reboot too
+        // Track it in the pending set so it survives reboot and cancelAll.
         val raw = prefs(context).getString(KEY_PENDING, null) ?: "[]"
         val arr = JSONArray(raw)
         arr.put(alarm)

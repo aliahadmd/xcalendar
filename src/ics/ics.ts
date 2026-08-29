@@ -40,10 +40,6 @@ function addProp(
   comp.addProperty(p);
 }
 
-function genUid(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}@xcalendar`;
-}
-
 /** Export the whole calendar to an .ics file and open the share sheet. */
 export async function exportIcs(): Promise<void> {
   const events = await getEvents();
@@ -55,7 +51,8 @@ export async function exportIcs(): Promise<void> {
   const stamp = new Date();
   for (const event of events) {
     const vevent = new ICAL.Component("vevent");
-    vevent.addPropertyWithValue("uid", event.uid ?? genUid());
+    // Deterministic fallback UID: repeated exports of the same event dedupe on import.
+    vevent.addPropertyWithValue("uid", event.uid ?? `${event.id}@xcalendar`);
     vevent.addPropertyWithValue("dtstamp", toIcsLocal(stamp));
     vevent.addPropertyWithValue("summary", event.title || "(untitled)");
     if (event.notes) vevent.addPropertyWithValue("description", event.notes);

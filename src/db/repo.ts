@@ -100,6 +100,8 @@ export async function saveEvent(
   event: CalendarEvent,
 ): Promise<void> {
   const db = await openDb();
+  // Stable UID so export → import round-trips dedupe instead of duplicating.
+  const uid = event.uid ?? `${event.id}@xcalendar`;
   await db.runAsync(
     `INSERT OR REPLACE INTO events
       (id, title, notes, location, type, category_id, start_at, end_at, all_day,
@@ -122,7 +124,7 @@ export async function saveEvent(
     event.completedAt,
     JSON.stringify(event.reminders),
     event.targetDate,
-    event.uid,
+    uid,
     event.createdAt,
     event.updatedAt,
   );
@@ -199,7 +201,7 @@ export async function importEvents(
         event.completedAt,
         JSON.stringify(event.reminders),
         event.targetDate,
-        event.uid,
+        event.uid ?? `${event.id}@xcalendar`,
         event.createdAt,
         event.updatedAt,
       );
@@ -219,6 +221,7 @@ export async function getOverdueTasks(
     (e) =>
       e.type === "task" &&
       !e.completedAt &&
+      !e.recurrence && // recurring tasks are never "overdue" — they recur
       e.dtstartDate &&
       e.dtstartDate < date,
   );

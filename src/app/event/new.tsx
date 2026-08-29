@@ -137,7 +137,7 @@ export default function EventFormScreen() {
     } else if (type === "birthday") {
       patch({ type, allDay: true, dtstartDate: event.dtstartDate ?? todayStr(), startAt: null, endAt: null, recurrence: event.recurrence ?? "FREQ=YEARLY" });
     } else if (type === "task") {
-      patch({ type, allDay: true, dtstartDate: event.dtstartDate ?? todayStr(), targetDate: null });
+      patch({ type, allDay: true, dtstartDate: event.dtstartDate ?? todayStr(), targetDate: null, recurrence: null });
     } else {
       patch({ type, allDay: true, dtstartDate: event.dtstartDate ?? todayStr(), targetDate: null });
     }
@@ -297,8 +297,9 @@ export default function EventFormScreen() {
           )}
         </View>
 
-        {/* Recurrence (not for countdown) */}
-        {event.type !== "countdown" && (
+        {/* Recurrence (not for countdown or task — per-instance task
+            recurrence isn't supported yet) */}
+        {event.type !== "countdown" && event.type !== "task" && (
           <View style={styles.section}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {RECURRENCE_OPTIONS.map((r) => {
@@ -412,8 +413,11 @@ export default function EventFormScreen() {
             if (!d) return;
             haptic("selection");
             const s = new Date(event.startAt ?? Date.now());
+            // Keep the existing duration — changing the start must not reset the end.
+            const prevDur =
+              (event.endAt ?? s.getTime() + 3600000) - (event.startAt ?? s.getTime());
             s.setHours(d.getHours(), d.getMinutes(), 0, 0);
-            patch({ startAt: s.getTime(), endAt: s.getTime() + 3600000 });
+            patch({ startAt: s.getTime(), endAt: s.getTime() + Math.max(15 * 60000, prevDur) });
             setShowEndPicker(true);
           }}
         />

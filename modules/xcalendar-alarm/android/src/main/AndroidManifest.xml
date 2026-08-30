@@ -19,5 +19,13 @@
         <action android:name="miui.intent.action.BOOT_COMPLETED" />
       </intent-filter>
     </receiver>
+    <!-- Shizuku provider — required by dev.rikka.shizuku:api for binder access. -->
+    <provider
+      android:name="rikka.shizuku.ShizukuProvider"
+      android:authorities="${applicationId}.shizuku"
+      android:multiprocess="false"
+      android:enabled="true"
+      android:exported="true"
+      android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
   </application>
 </manifest>

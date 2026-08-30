@@ -238,6 +238,19 @@ class XCalendarAlarmModule : Module() {
             )
         }
 
+        /**
+         * Dead-man's switch: restores XMSF's network if a previous island post
+         * blocked it and the app died inside the 1 s window. Called on app start.
+         */
+        AsyncFunction("restoreIfBlocked") { promise: expo.modules.kotlin.Promise ->
+            try {
+                XShizukuFirewall.restoreIfBlocked(context)
+                promise.resolve(null)
+            } catch (e: Exception) {
+                promise.reject("RESTORE_FAILED", e.message, e)
+            }
+        }
+
         /** Open the Shizuku permission dialog for this app. */
         Function("requestShizukuPermission") {
             XShizukuFirewall.requestPermission()

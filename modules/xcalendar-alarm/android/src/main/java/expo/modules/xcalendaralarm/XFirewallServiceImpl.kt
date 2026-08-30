@@ -65,25 +65,19 @@ class XFirewallServiceImpl : IXFirewallService.Stub() {
             ?: throw RuntimeException("asInterface returned null")
     }
 
-    /** Match by name + parameter count (exact-type lookup fails on hidden APIs). */
+    /**
+     * Match by name AND exact parameter type signature — count-only matching
+     * could bind to a wrong overload if HyperOS adds one.
+     */
     private fun call(obj: Any, methodName: String, vararg args: Any) {
+        val argTypes = args.map { it::class.javaPrimitiveType ?: it.javaClass }.toTypedArray()
         val method = obj.javaClass.methods.find {
-            it.name == methodName && it.parameterCount == args.size
-        } ?: throw NoSuchMethodException("$methodName(${args.size} params) on ${obj.javaClass.name}")
-
-        val coerced = Array(args.size) { i ->
-            val param = method.parameterTypes[i]
-            val arg = args[i]
-            when {
-                param == Int::class.javaPrimitiveType && arg is Int -> arg
-                param == Boolean::class.javaPrimitiveType && arg is Boolean -> arg
-                param == Boolean::class.javaPrimitiveType && arg is Int -> arg != 0
-                param == Int::class.javaPrimitiveType && arg is Boolean -> if (arg) 1 else 0
-                else -> arg
-            }
-        }
+            it.name == methodName && it.parameterTypes.contentEquals(argTypes)
+        } ?: throw NoSuchMethodException(
+            "$methodName(${argTypes.joinToString(",")}) on ${obj.javaClass.name}",
+        )
         try {
-            method.invoke(obj, *coerced)
+            method.invoke(obj, *args)
         } catch (e: InvocationTargetException) {
             Log.e(TAG, "$methodName threw: ${e.targetException?.message}")
             throw e

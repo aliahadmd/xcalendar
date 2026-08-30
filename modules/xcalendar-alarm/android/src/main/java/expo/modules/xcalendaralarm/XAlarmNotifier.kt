@@ -16,7 +16,6 @@ import org.json.JSONObject
 object XAlarmNotifier {
     const val CHANNEL_ID = "xcalendar_alarms"
     const val TEST_CHANNEL_ID = "xcalendar_island_test"
-    private const val ISLAND_PIC = "miui.focus.pic_island"
     private const val ISLAND_TEST_NOTIF_ID = 910001
 
     fun ensureChannel(context: Context) {
@@ -73,60 +72,6 @@ object XAlarmNotifier {
         false
     }
 
-    private fun clip(s: String?, n: Int): String {
-        val v = (s ?: "").trim()
-        return if (v.length <= n) v else v.take(n - 1) + "…"
-    }
-
-    /**
-     * Official HyperOS 3 Super Island payload (dev.mi.com), field-for-field
-     * matched to the empirically working HyperIsland-ToolKit models:
-     *   root:      { param_v2: {...}, isShowNotification: true }
-     *   param_v2:  protocol=3, business, updatable, ticker, aodTitle,
-     *              param_island → { islandProperty, islandPriority,
-     *              bigIslandArea → imageTextInfoLeft → { type, picInfo, textInfo },
-     *              smallIslandArea → { picInfo } }, baseInfo
-     * miui.focus.param is limited to 3072 bytes — titles/bodies are clipped.
-     */
-    private fun buildV3Param(title: String, body: String, updatable: Boolean): String {
-        val textInfo = JSONObject()
-            .put("title", clip(title, 20))
-            .put("content", clip(body, 40))
-            .put("showHighlightColor", true)
-        val leftArea = JSONObject()
-            .put("type", 1)
-            .put("picInfo", JSONObject().put("type", 1).put("pic", ISLAND_PIC))
-            .put("textInfo", textInfo)
-        val paramIsland = JSONObject()
-            .put("islandProperty", 1)
-            .put("islandPriority", 2)
-            .put("bigIslandArea", JSONObject().put("imageTextInfoLeft", leftArea))
-            .put(
-                "smallIslandArea",
-                JSONObject().put("picInfo", JSONObject().put("type", 1).put("pic", ISLAND_PIC)),
-            )
-        val paramV2 = JSONObject()
-            .put("protocol", 3)
-            .put("business", "xcalendar_alarm")
-            .put("updatable", updatable)
-            // OS3-only apps must pass ticker or the status-bar notification won't show.
-            .put("ticker", clip(title, 20))
-            .put("enableFloat", true)
-            .put("isShowNotification", true)
-            .put("islandFirstFloat", true)
-            .put("aodTitle", clip(title, 20))
-            .put("param_island", paramIsland)
-            .put(
-                "baseInfo",
-                JSONObject().put("type", 1).put("title", clip(title, 30)).put("content", clip(body, 60)),
-            )
-        // Top-level wrapper shape used by the working toolkit.
-        return JSONObject()
-            .put("param_v2", paramV2)
-            .put("isShowNotification", true)
-            .toString()
-    }
-
     /** Legacy OS2 focus-notification payload (reverse-engineered, pre-Super-Island devices). */
     private fun buildV2Param(title: String, body: String): String {
         val baseInfo = JSONObject()
@@ -162,7 +107,7 @@ object XAlarmNotifier {
                 "focusParamJson: protocol=$protocol island=${islandSupported(context)} xiaomi=true",
             )
             when {
-                protocol >= 3 -> buildV3Param(title, body, updatable).also {
+                protocol >= 3 -> XFocusPayload.alarmV3Param(title, body, updatable).also {
                     android.util.Log.d("XCalendarAlarm", "V3 payload (${it.length}B): $it")
                 }
                 protocol == 2 -> buildV2Param(title, body)
@@ -183,7 +128,7 @@ object XAlarmNotifier {
                     "miui.focus.pics",
                     Bundle().apply {
                         putParcelable(
-                            ISLAND_PIC,
+                            XFocusPayload.ISLAND_PIC,
                             Icon.createWithResource(context, context.applicationInfo.icon),
                         )
                     },

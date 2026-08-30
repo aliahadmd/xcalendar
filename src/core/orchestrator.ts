@@ -4,6 +4,7 @@ import { loadSettings } from "@/db/settings";
 import { rescheduleAll } from "@/notifications/scheduler";
 import { updateIsland } from "@/notifications/island";
 import { refreshWidgets } from "@/widget/refresh";
+import XCalendarAlarm from "xcalendar-alarm";
 
 let initialized = false;
 
@@ -25,6 +26,9 @@ export async function initApp(): Promise<void> {
   await seedIfEmpty();
   await loadSettings();
   onDataChanged(scheduleSideEffects);
+  // Safety first: if a previous island post blocked XMSF and the process died
+  // inside the 1 s window, restore it now (dead-man's switch).
+  XCalendarAlarm.restoreIfBlocked().catch(() => {});
   try {
     await rescheduleAll();
     await refreshWidgets();

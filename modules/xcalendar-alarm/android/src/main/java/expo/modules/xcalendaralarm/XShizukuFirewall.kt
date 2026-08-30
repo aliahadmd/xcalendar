@@ -1,7 +1,10 @@
 package expo.modules.xcalendaralarm
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
@@ -18,10 +21,21 @@ import rikka.shizuku.Shizuku
  * that verification fail OPEN, so unwhitelisted apps render native Super Island
  * content. No root — the UserService runs inside the Shizuku server process,
  * which holds ADB-shell privileges.
+ *
+ * Safety: a crash between block and the ~1 s delayed restore would leave XMSF
+ * offline indefinitely. Three layers prevent that:
+ *   1. a persisted "blocked at" marker, restored unconditionally on next app
+ *      start ([restoreIfBlocked]),
+ *   2. an exact AlarmManager failsafe fired 30 s after blocking
+ *      ([XMsfRestoreReceiver]) — survives process death,
+ *   3. the normal 1 s delayed restore on the happy path.
  */
 object XShizukuFirewall {
     private const val TAG = "XCalendarAlarm"
     private const val XMSF_PACKAGE = "com.xiaomi.xmsf"
+    private const val KEY_BLOCKED_AT = "xmsf_blocked_at"
+    private const val RESTORE_ALARM_REQUEST = 930101
+    private const val RESTORE_FAILSAFE_MS = 30_000L
 
     @Volatile
     private var service: IXFirewallService? = null
@@ -37,6 +51,9 @@ object XShizukuFirewall {
             Log.d(TAG, "firewall user service disconnected")
         }
     }
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences("xcalendar_alarms", Context.MODE_PRIVATE)
 
     fun isShizukuRunning(): Boolean = try {
         Shizuku.pingBinder()
@@ -71,6 +88,14 @@ object XShizukuFirewall {
         -1
     }
 
+    /** App's own versionCode — Shizuku reloads the UserService when this changes. */
+    private fun appVersionCode(context: Context): Int = try {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
+    } catch (e: Throwable) {
+        1
+    }
+
     /** Bind (once) and return the privileged firewall service. */
     @Synchronized
     private fun obtainService(context: Context, timeoutMs: Long = 5000): IXFirewallService? {
@@ -82,7 +107,9 @@ object XShizukuFirewall {
             )
                 .daemon(true)
                 .processNameSuffix("firewall")
-                .version(2) // bump to force Shizuku to reload the service after app updates
+                // Derived from the app version so Shizuku automatically reloads
+                // the service after every app update — no manual bump to forget.
+                .version(appVersionCode(context))
                 .debuggable(false)
             Shizuku.bindUserService(args, connection)
             val start = System.currentTimeMillis()
@@ -96,33 +123,99 @@ object XShizukuFirewall {
         }
     }
 
+    private fun restoreAlarmPendingIntent(context: Context): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            RESTORE_ALARM_REQUEST,
+            Intent(context, XMsfRestoreReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    private fun scheduleRestoreFailsafe(context: Context) {
+        try {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            am.setExactAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                android.os.SystemClock.elapsedRealtime() + RESTORE_FAILSAFE_MS,
+                restoreAlarmPendingIntent(context),
+            )
+        } catch (t: Throwable) {
+            Log.e(TAG, "scheduleRestoreFailsafe failed", t)
+        }
+    }
+
+    private fun cancelRestoreFailsafe(context: Context) {
+        try {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            am.cancel(restoreAlarmPendingIntent(context))
+        } catch (t: Throwable) {
+            // non-fatal
+        }
+    }
+
     /** Temporarily block XMSF's network so the signature check fails open. */
     fun blockXmsf(context: Context): Boolean {
         val uid = xmsfUid(context)
         if (uid < 0) return false
-        val s = obtainService(context) ?: return false
+        // Dead-man's switch FIRST: if anything kills us mid-window, the next
+        // app start and the 30 s failsafe alarm both find the marker and restore.
+        prefs(context).edit().putLong(KEY_BLOCKED_AT, System.currentTimeMillis()).apply()
+        scheduleRestoreFailsafe(context)
+        val s = obtainService(context) ?: run {
+            Log.e(TAG, "blockXmsf: no Shizuku service — restoring marker state")
+            restoreIfBlocked(context)
+            return false
+        }
         return try {
             s.setUidNetworkBlocked(uid, true).also {
                 Log.d(TAG, "XMSF (uid=$uid) network blocked=$it")
             }
         } catch (t: Throwable) {
             Log.e(TAG, "blockXmsf failed: ${t.message}")
+            restoreIfBlocked(context)
             false
         }
     }
 
-    /** Restore XMSF's network (the OEM chain itself stays enabled — HyperBridge does the same). */
+    /**
+     * Restore XMSF's network. Keeps the blocked-marker if the restore could not
+     * be applied (Shizuku down), so a later [restoreIfBlocked] retries.
+     */
     fun restoreXmsf(context: Context): Boolean {
         val uid = xmsfUid(context)
-        if (uid < 0) return false
-        val s = service ?: return true // nothing was blocked
+        if (uid < 0) {
+            prefs(context).edit().remove(KEY_BLOCKED_AT).apply()
+            return false
+        }
+        val s = obtainService(context, timeoutMs = 2500)
+        if (s == null) {
+            Log.w(TAG, "restoreXmsf: Shizuku unavailable — marker kept for retry")
+            return false
+        }
         return try {
-            s.setUidNetworkBlocked(uid, false).also {
-                Log.d(TAG, "XMSF (uid=$uid) network restored=$it")
+            val ok = s.setUidNetworkBlocked(uid, false)
+            Log.d(TAG, "XMSF (uid=$uid) network restored=$ok")
+            if (ok) {
+                prefs(context).edit().remove(KEY_BLOCKED_AT).apply()
+                cancelRestoreFailsafe(context)
             }
+            ok
         } catch (t: Throwable) {
             Log.e(TAG, "restoreXmsf failed: ${t.message}")
             false
         }
+    }
+
+    /**
+     * Dead-man's switch entry point: if the persisted marker says XMSF may
+     * still be blocked (crash inside the 1 s block window), restore now.
+     * Called on every app start, from the 30 s failsafe alarm, and from
+     * alarm/broadcast receivers. No-op when nothing is pending.
+     */
+    fun restoreIfBlocked(context: Context) {
+        val blockedAt = prefs(context).getLong(KEY_BLOCKED_AT, -1L)
+        if (blockedAt == -1L) return
+        Log.w(TAG, "dead-man restore: XMSF was blocked at $blockedAt — restoring now")
+        restoreXmsf(context)
     }
 }

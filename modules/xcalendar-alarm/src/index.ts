@@ -66,4 +66,6 @@ export default requireNativeModule("XCalendarAlarm") as {
   getShizukuState(): XShizukuState;
   requestShizukuPermission(): boolean;
   isIslandSupported(): boolean;
+  /** Dead-man's switch: restore XMSF's network if a previous island post blocked it and died mid-window. */
+  restoreIfBlocked(): Promise<void>;
 };

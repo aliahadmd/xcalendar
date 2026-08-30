@@ -1,6 +1,6 @@
 # XCalendar — Project Report
 
-**Version 1.2.0 · August 30, 2026 · Android**
+**Version 1.2.1 · August 30, 2026 · Android**
 
 A minimal, Apple-style personal calendar application, purpose-built for a single user's Xiaomi Redmi K80 Pro — with an uncompromising, aggressively reliable reminder system as the centerpiece, and the next event always live on the phone's Super Island.
 
@@ -195,6 +195,7 @@ The app was driven over ADB through every screen with screenshot review:
 8. **Flaky local VPN proxy** intercepting Gradle downloads — builds bypass the system proxy; dl.google.com/Maven Central are reachable directly.
 9. **v1.1.0 audit fixes** — the test alarm wiped all armed reminders (`replaceAll`); all-day reminders fired at midnight; multi-day spans fired once per day; edited titles left stale alarm content; export→import duplicated every event (random UIDs); recurring tasks never recurred; recurring timed events vanished from Day view (RRULE window end anchored at midnight). All fixed with regression tests.
 10. **Super Island whitelist (v1.2.0)** — the payload was delivered intact (`focusType=PARAMS`) yet parsed to `{}`: Xiaomi's XMSF verifies the app signature *online* and discards unlisted apps' content. Defeated via the Shizuku XMSF-network block. Two sub-bugs en route: in-app reflection on `IConnectivityManager` is blocked by Android's hidden-API enforcement (solved by running the reflection inside the Shizuku UserService process, where it's unrestricted), and the restore call threw `NetworkOnMainThreadException` (the connectivity service destroys the blocked UID's sockets when the chain is re-enabled — fixed by enabling the chain only on block and retrying the rule once).
+12. **v1.2.1 hardening** — the 1-second XMSF block window had a crash-window failure mode: a process death between block and the delayed restore would leave XMSF offline indefinitely. Now triple-covered: a persisted blocked-marker restored unconditionally on next app start (live-verified: force-stop inside the window → relaunch → `dead-man restore … restored=true`), a 30-second exact-alarm failsafe receiver for real crashes, and a JS+native double dedupe (persisted payload identity + 60-second throttle) so identical island content never re-posts. Also: UserService version now derives from the app versionCode (no manual bump), firewall reflection matches exact parameter signatures, and the OS3 payload builders moved into one shared `XFocusPayload`.
 11. Smaller ones: missing `GestureHandlerRootView`, raw-text children in Views (RN 0.86 drops them silently), Android `contentOffset` being iOS-only, `expo-notifications` channel `sound: "default"` rejection, a WAV generator precedence bug producing 44-byte files.
 
 ---
@@ -202,7 +203,7 @@ The app was driven over ADB through every screen with screenshot review:
 ## 9. Release
 
 - **Repo**: `github.com/aliahadmd/xcalendar` (private, branch `main`)
-- **Releases**: `v1.0.0` (initial) · `v1.1.0` (audit fixes + test baseline) · `v1.2.0` (Super Island) — each with the debug-signed arm64 APK attached (≈116 MB, personal sideloading)
+- **Releases**: `v1.0.0` (initial) · `v1.1.0` (audit fixes + test baseline) · `v1.2.0` (Super Island) · `v1.2.1` (island safety hardening) — each with the debug-signed arm64 APK attached (≈116 MB, personal sideloading)
 - **Installed**: running on the target phone with all HyperOS permissions green, live reminders armed, Shizuku-powered island active
 - **Rebuild**: `npm install` → `npx expo prebuild --platform android --clean` → `cd android && ./gradlew assembleRelease` (in-place rebuild preserves the local debug-signing config in `android/app/build.gradle`; `android/` is gitignored)
 - **Verification**: `npm run typecheck` · `npm run test` (vitest, 21 tests)
@@ -213,7 +214,7 @@ The app was driven over ADB through every screen with screenshot review:
 
 - Reminder window is 14 days ahead (max 60 alarms); longer-horizon reminders reschedule as time advances — by design.
 - **The island depends on Shizuku**: after every phone reboot the Shizuku server must be restarted (one adb command from the Mac, or wireless debugging in the Shizuku app). Until then the island falls back to a plain notification card and the workaround simply doesn't engage — alarms are unaffected.
-- The island countdown text refreshes on app open / data change, not per-minute live ticking (each refresh costs XMSF ~1 s offline).
+- The island countdown text refreshes on app open / data change, not per-minute live ticking (each refresh costs XMSF ~1 s offline; identical payloads are deduped natively and rapid saves are throttled to one post per minute).
 - Custom alarm sound is the system alarm ringtone; a bundled custom alarm tone could be added.
 - Widget refreshes on data change, widget add, and every 30 minutes; a mid-night-tick background refresh could sharpen the date header.
 - Recurrence editing scope: editing a single occurrence of a series edits the whole series (no per-instance exceptions yet).

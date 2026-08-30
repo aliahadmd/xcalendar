@@ -26,15 +26,9 @@ object XIslandPoster {
     private const val TAG = "XCalendarAlarm"
     const val CHANNEL_ID = "xcalendar_island"
     private const val NOTIF_ID = 930001
-    private const val ISLAND_PIC = "miui.focus.pic_island"
     private val handler = Handler(Looper.getMainLooper())
 
     fun focusProtocol(context: Context): Int = XAlarmNotifier.focusProtocol(context)
-
-    private fun clip(s: String?, n: Int): String {
-        val v = (s ?: "").trim()
-        return if (v.length <= n) v else v.take(n - 1) + "…"
-    }
 
     private fun ensureChannel(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -49,67 +43,6 @@ object XIslandPoster {
                 enableVibration(false)
             },
         )
-    }
-
-    private fun buildV3Param(
-        title: String,
-        subtitle: String,
-        content: String,
-        subContent: String,
-        extraTitle: String,
-        ticker: String,
-        aod: String,
-    ): String {
-        // Big island, left: app icon + event name + date/time.
-        val leftText = JSONObject()
-            .put("title", clip(title, 24))
-            .put("content", clip(subtitle, 40))
-            .put("showHighlightColor", true)
-        val leftArea = JSONObject()
-            .put("type", 1)
-            .put("picInfo", JSONObject().put("type", 1).put("pic", ISLAND_PIC))
-            .put("textInfo", leftText)
-        // Big island, right: the live countdown.
-        val rightText = JSONObject()
-            .put("title", clip(content, 16))
-            .put("showHighlightColor", true)
-        val rightArea = JSONObject()
-            .put("type", 1)
-            .put("textInfo", rightText)
-        val paramIsland = JSONObject()
-            .put("islandProperty", 1)
-            .put("islandPriority", 2)
-            .put(
-                "bigIslandArea",
-                JSONObject().put("imageTextInfoLeft", leftArea).put("imageTextInfoRight", rightArea),
-            )
-            .put(
-                "smallIslandArea",
-                JSONObject().put("picInfo", JSONObject().put("type", 1).put("pic", ISLAND_PIC)),
-            )
-        // Notification card (baseInfo): label, event, date·time, countdown, next-up.
-        val baseInfo = JSONObject()
-            .put("type", 1)
-            .put("extraTitle", clip(extraTitle, 20))
-            .put("title", clip(title, 30))
-            .put("subTitle", clip(subtitle, 30))
-            .put("content", clip(content, 60))
-        if (subContent.isNotBlank()) baseInfo.put("subContent", clip(subContent, 60))
-        val paramV2 = JSONObject()
-            .put("protocol", 3)
-            .put("business", "xcalendar_next_event")
-            .put("updatable", true)
-            .put("ticker", clip(ticker, 40))
-            .put("enableFloat", true)
-            .put("isShowNotification", true)
-            .put("islandFirstFloat", false)
-            .put("aodTitle", clip(aod, 30))
-            .put("param_island", paramIsland)
-            .put("baseInfo", baseInfo)
-        return JSONObject()
-            .put("param_v2", paramV2)
-            .put("isShowNotification", true)
-            .toString()
     }
 
     private fun buildNotification(
@@ -147,7 +80,7 @@ object XIslandPoster {
                         "miui.focus.pics",
                         Bundle().apply {
                             putParcelable(
-                                ISLAND_PIC,
+                                XFocusPayload.ISLAND_PIC,
                                 Icon.createWithResource(context, context.applicationInfo.icon),
                             )
                         },
@@ -166,6 +99,9 @@ object XIslandPoster {
     /**
      * Post (or update) the persistent next-event island, applying the XMSF
      * network workaround around the post when Shizuku is available.
+     *
+     * Identical payloads are skipped without touching XMSF (the param string
+     * is persisted, so the dedupe survives process death).
      */
     fun post(context: Context, data: Map<String, Any>): Boolean {
         return try {
@@ -177,13 +113,21 @@ object XIslandPoster {
             val extraTitle = str(data, "extraTitle", "Next event")
             val ticker = str(data, "ticker", title)
             val aod = str(data, "aod", if (subtitle.isNotBlank()) "$title $subtitle" else title)
-            val param = buildV3Param(title, subtitle, content, subContent, extraTitle, ticker, aod)
+            val param = XFocusPayload.islandV3Param(title, subtitle, content, subContent, extraTitle, ticker, aod)
+
+            val prefs = context.getSharedPreferences("xcalendar_alarms", Context.MODE_PRIVATE)
+            if (prefs.getString("last_island_param", null) == param) {
+                Log.d(TAG, "island skipped — identical payload already posted")
+                return true
+            }
+
             val useShizuku =
                 XShizukuFirewall.isShizukuRunning() && XShizukuFirewall.isPermissionGranted()
             if (useShizuku) XShizukuFirewall.blockXmsf(context)
             try {
                 val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.notify(NOTIF_ID, buildNotification(context, title, subtitle, content, param))
+                prefs.edit().putString("last_island_param", param).apply()
                 Log.d(TAG, "island posted: '$title' · '$subtitle' · '$content' (shizuku=$useShizuku)")
             } finally {
                 if (useShizuku) {
@@ -206,6 +150,8 @@ object XIslandPoster {
         return try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(NOTIF_ID)
+            context.getSharedPreferences("xcalendar_alarms", Context.MODE_PRIVATE)
+                .edit().remove("last_island_param").apply()
             true
         } catch (e: Exception) {
             false

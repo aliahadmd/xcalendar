@@ -61,6 +61,8 @@ On HyperOS 3, XCalendar keeps the **next upcoming event** on the native Super Is
 
 Xiaomi gates custom island content behind a **whitelist**: the system's XMSF service verifies an app's signature *online*, and unlisted apps' island payloads are silently discarded. XCalendar defeats this with the "Stardawn workaround" (the same technique as the open-source [HyperBridge](https://github.com/D4vidDf/HyperBridge)): around each island post it **briefly blocks XMSF's network** via a firewall rule, so the whitelist check fails open and the content renders. XMSF is back online ~1 second later. This needs **Shizuku** — ADB-shell privileges, **no root, no bootloader unlock**.
 
+**Safety layers around the block window** (a crash mid-window would otherwise leave XMSF offline): a persisted marker is restored unconditionally on the next app start, a 30-second exact-alarm failsafe restores it even after a process crash, and identical island payloads are never re-posted (persisted dedupe) plus a 60-second throttle for rapid consecutive saves.
+
 ### Shizuku setup (one time)
 
 1. Install Shizuku on the phone — from [Google Play](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) or the [GitHub releases](https://github.com/RikkaApps/Shizuku/releases) (`shizuku-v*.apk`, then `adb install -r shizuku.apk`)

@@ -6,6 +6,15 @@ import { todayStr, dateStrFromEpoch, format, differenceInCalendarDays } from "@/
 
 const HORIZON_DAYS = 7;
 
+// Every island post takes XMSF offline for ~1 s (whitelist workaround).
+// Identical payloads are deduped natively (persisted marker); this adds a
+// session-level signature + minimum interval so rapid consecutive saves
+// don't each cost a system-wide second of XMSF downtime. Posts still go
+// out immediately when the next event genuinely changes.
+const MIN_POST_INTERVAL_MS = 60_000;
+let lastSignature: string | null = null;
+let lastPostAt = 0;
+
 function countdownLabel(ms: number): string {
   const min = Math.max(0, Math.round(ms / 60000));
   if (min < 1) return "Starting now";
@@ -27,7 +36,7 @@ function countdownLabel(ms: number): string {
  * The card shows: label ("Next event"), title, date · time, countdown, and
  * the following event. Refreshed on every app open and data change.
  */
-export async function updateIsland(): Promise<void> {
+export async function updateIsland(options: { force?: boolean } = {}): Promise<void> {
   try {
     if (!XCalendarAlarm.isIslandSupported()) return;
 
@@ -52,6 +61,7 @@ export async function updateIsland(): Promise<void> {
     upcoming.sort((a, b) => a.start - b.start);
 
     if (upcoming.length === 0) {
+      lastSignature = null;
       XCalendarAlarm.cancelIsland();
       return;
     }
@@ -64,7 +74,7 @@ export async function updateIsland(): Promise<void> {
     const dateLabel =
       days === 0 ? "Today" : days === 1 ? "Tomorrow" : format(new Date(next.start), "EEE, d MMM");
 
-    XCalendarAlarm.postIsland({
+    const payload = {
       title: next.title,
       subtitle: `${dateLabel} · ${time(next.start)}`,
       content: countdownLabel(next.start - now),
@@ -74,7 +84,19 @@ export async function updateIsland(): Promise<void> {
       extraTitle: "Next event",
       ticker: `${next.title} · ${time(next.start)}`,
       aod: `${next.title} · ${time(next.start)}`,
-    });
+    };
+
+    // Throttle: skip when the payload is unchanged, or when it changed within
+    // a minute of the last post (rapid consecutive saves). `force` bypasses.
+    const signature = JSON.stringify(payload);
+    if (!options.force) {
+      if (signature === lastSignature) return;
+      if (Date.now() - lastPostAt < MIN_POST_INTERVAL_MS) return;
+    }
+    lastSignature = signature;
+    lastPostAt = Date.now();
+
+    XCalendarAlarm.postIsland(payload);
   } catch {
     // the island is best-effort — never break alarm scheduling
   }

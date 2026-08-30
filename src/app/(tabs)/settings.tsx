@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, StyleSheet, ScrollView, Switch } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
@@ -20,7 +20,6 @@ import type { ThemeMode } from "@/theme/theme";
 export default function SettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const settings = useSettings();
   const [perms, setPerms] = useState<XAlarmPermissionStates | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
@@ -156,11 +155,6 @@ export default function SettingsScreen() {
             onPress={() => XCalendarAlarm.openExactAlarmSettings()}
           />
           <StatusRow
-            label="HyperIsland focus notification"
-            ok={perms?.focus}
-            onPress={() => XCalendarAlarm.openAppNotificationSettings()}
-          />
-          <StatusRow
             label="Display over other apps"
             ok={perms?.overlay}
             onPress={() => XCalendarAlarm.openOverlaySettings()}
@@ -174,14 +168,6 @@ export default function SettingsScreen() {
             onPress={openBatterySettings}
           />
           <ActionRow icon="flame-outline" label="🔔 Send test alarm (8 seconds)" onPress={fireTest} />
-          <ActionRow
-            icon="eye-outline"
-            label="Super Island test (HyperOS 3)"
-            onPress={() => {
-              haptic("light");
-              router.push("/island-test");
-            }}
-          />
           {perms && !perms.notifications && (
             <ThemedText variant="footnote" style={{ color: theme.colors.destructive, padding: 12, paddingTop: 4 }}>
               Turn every switch green — each one closes a way HyperOS can swallow a reminder.

@@ -12,7 +12,6 @@
       android:theme="@android:style/Theme.Material.NoActionBar" />
     <receiver android:name=".XAlarmReceiver" android:exported="false" />
     <receiver android:name=".XAlarmActionReceiver" android:exported="false" />
-    <receiver android:name=".XMsfRestoreReceiver" android:exported="false" />
     <receiver android:name=".XAlarmBootReceiver" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -20,13 +19,5 @@
         <action android:name="miui.intent.action.BOOT_COMPLETED" />
       </intent-filter>
     </receiver>
-    <!-- Shizuku provider — required by dev.rikka.shizuku:api for binder access. -->
-    <provider
-      android:name="rikka.shizuku.ShizukuProvider"
-      android:authorities="${applicationId}.shizuku"
-      android:multiprocess="false"
-      android:enabled="true"
-      android:exported="true"
-      android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
   </application>
 </manifest>

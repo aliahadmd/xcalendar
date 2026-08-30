@@ -1,8 +1,8 @@
 # XCalendar — Project Report
 
-**Version 1.2.1 · August 30, 2026 · Android**
+**Version 1.3.0 · August 31, 2026 · Android**
 
-A minimal, Apple-style personal calendar application, purpose-built for a single user's Xiaomi Redmi K80 Pro — with an uncompromising, aggressively reliable reminder system as the centerpiece, and the next event always live on the phone's Super Island.
+A minimal, Apple-style personal calendar application, purpose-built for a single user's Xiaomi Redmi K80 Pro — with an uncompromising, aggressively reliable reminder system as the centerpiece. Fully standalone: no companion apps, no external privileges (the Shizuku-based Super Island integration of v1.2.x was removed in v1.3.0).
 
 ---
 
@@ -24,7 +24,7 @@ Success criteria, all met:
 | SQLite storage | ✅ |
 | ICS export/import | ✅ |
 | Home-screen widget | ✅ |
-| Next event always on the Super Island (front-camera pill) | ✅ (v1.2.0, live-verified) |
+| Zero external dependencies / companion apps | ✅ (v1.3.0 — Super Island + Shizuku removed) |
 | Personal use — no app-store constraints, "go full aggressive" on permissions | ✅ |
 
 ---
@@ -50,7 +50,7 @@ The phone was connected via ADB for the entire project, which enabled **on-devic
 | Framework | **Expo SDK 57** (React Native 0.86, New Architecture, React Compiler) | Current as of Aug 2026; dev build workflow fits personal hardware-targeted apps |
 | Navigation | **Expo Router v7** | File-based routes, typed routes, deep links (`xcalendar://event/new?type=…`) |
 | Storage | **expo-sqlite** (WAL) + in-memory cache + pub/sub invalidation | Personal-scale data fits in memory; every view reads from one cache |
-| Alarms | **Custom native Kotlin Expo module** (`modules/xcalendar-alarm`) | `AlarmManager.setAlarmClock()` + full-screen alarm activity + HyperIsland extras — nothing off-the-shelf was aggressive enough |
+| Alarms | **Custom native Kotlin Expo module** (`modules/xcalendar-alarm`) | `AlarmManager.setAlarmClock()` + full-screen lockscreen alarm activity — nothing off-the-shelf was aggressive enough |
 | Recurrence | **rrule** | Full RRULE support; imports Google Calendar rules directly |
 | Calendar data | **ical.js** | Battle-tested ICS parse/serialize (VALARM, VTODO, categories) |
 | Widgets | **react-native-android-widget** | Actively maintained, Expo config-plugin support |
@@ -82,8 +82,8 @@ src/
 ├── core/                 # app orchestrator (init + change side-effects)
 └── utils/                # date (local-date-string safety), haptics, sound
 
-modules/xcalendar-alarm/  # native Kotlin: scheduler, receiver, alarm activity,
-                          # HyperIsland extras, action receiver, boot receiver
+modules/xcalendar-alarm/  # native Kotlin: scheduler, receiver, full-screen
+                          # alarm activity, action receiver, boot receiver
 widget-task-handler.tsx   # widget headless entry (project root, per plugin contract)
 ```
 
@@ -122,18 +122,15 @@ A dedicated native module (`modules/xcalendar-alarm`, Kotlin) implementing the s
 2. **Rolling 14-day scheduler** (max 60 alarms) recomputed on every data change, app open, and permission grant — atomically replacing the native pending set. Loop-safe (signature dedupe).
 3. **Full-screen alarm activity** — launched via full-screen-intent **and** a direct background-activity-start fallback; shows over the lock screen (`setShowWhenLocked`/`setTurnScreenOn`), wakes the display, loops the system alarm ringtone (USAGE_ALARM) with repeating vibration, big red **Done** + **Snooze 10 min** buttons, auto-dismiss after 2 min.
 4. **Heads-up notification** — importance HIGH, `CATEGORY_ALARM`, alarm-sound channel with vibration pattern and DND bypass, per-alarm grouping (prevents Android's silent auto-group), ✓ Done / Snooze actions wired.
-5. **HyperIsland (focus notification) extras** — every alarm carries the official HyperOS 3 `miui.focus.param` payload (protocol 3, `param_v2` structure per Xiaomi's dev.mi.com guide), so HyperOS can surface reminders on the Super Island; version-detected (OS1/OS2/OS3) and degrading gracefully to a normal notification.
+5. **Pure Android delivery** — no island/focus-notification extras as of v1.3.0; alarms deliver through the full-screen activity and the heads-up notification only.
 6. **Reboot survival** — alarms persisted and re-registered by a boot receiver (BOOT_COMPLETED + MIUI QUICKBOOT).
-7. **Permissions Hub** (Settings → *Alarms & reminders*) — live green/red status for Notifications, Full-screen alarms, Alarms & reminders access, HyperIsland focus, Display over other apps, Autostart, Battery — each row deep-links to the exact system screen, plus a **"Send test alarm (8 seconds)"** button that exercises the entire pipeline end-to-end.
+7. **Permissions Hub** (Settings → *Alarms & reminders*) — live green/red status for Notifications, Full-screen alarms, Alarms & reminders access, Display over other apps, Autostart, Battery — each row deep-links to the exact system screen, plus a **"Send test alarm (8 seconds)"** button that exercises the entire pipeline end-to-end.
 
-### 5.5 Next event on the Super Island (v1.2.0)
-The next upcoming event lives **permanently on the phone's Super Island** (the pill around the front camera) — the *native* system island, not an overlay or a fake media player:
+### 5.5 Super Island integration — built in v1.2.x, removed in v1.3.0
 
-- **Rich content**: pill (app icon) → tap to expand the big island showing *event title · date · time* on the left and the **live countdown** ("in 16h 5m") on the right; pulling down reveals a full card: "Next event" label, title, date · time, countdown, and the **following event** ("Then · Team sync · 11:00 AM"). Also surfaces on the Always-On Display and status-bar ticker when the screen is off.
-- **Auto-refresh**: reposted on every app open and every data change; honors the 24-hour setting; skips completed tasks; looks up to 7 days ahead.
-- **The whitelist workaround (the hard part)**: HyperOS verifies custom island content *online* — XMSF (`com.xiaomi.xmsf`) asks Xiaomi's servers whether the app's signature is whitelisted, and unlisted apps' payloads are silently discarded (`FocusPlugin: onAuthFailed`). XCalendar defeats this with the "Stardawn workaround" (pioneered by the open-source HyperBridge): a **Shizuku UserService** running in the shell-privileged Shizuku server process briefly **blocks XMSF's network** via hidden `IConnectivityManager` firewall APIs (`setUidFirewallRule`, OEM chain 9), the island notification is posted *inside that window* so the check fails open, and XMSF's network is restored ~1 second later. No root, no bootloader unlock — only ADB/Shizuku privileges.
-- **Debug harness**: Settings → *Super Island test* (also `xcalendar://island-test`) shows live capability/permission/Shizuku status with post/cancel controls.
-- Two implementation routes were built and tested en route: the official OS3 focus payload (works only when the whitelist check is neutralized) and a media-session island (worked but rendered as a fake player card — **removed** in favor of the real island).
+v1.2.0 shipped a striking capability: the next event rendered on HyperOS 3's native Super Island (front-camera pill → big island with live countdown → full card), achieved by defeating Xiaomi's online island-content whitelist with a Shizuku UserService that briefly blocked the XMSF service's network around each post (the "Stardawn workaround", after HyperBridge). It was fully working and verified on device.
+
+It was **removed in v1.3.0** by design decision: the feature required a companion app (Shizuku) restarted after every phone reboot, took a system service (XMSF) offline for ~1 s on every post, and carried more operational complexity than a personal calendar should. The removal eliminated five native files (island poster, Shizuku firewall, privileged reflection service, AIDL interface, focus-payload builders) and restored the app to a zero-dependency, install-and-go state. Full history remains in git tags `v1.2.0`–`v1.2.1`.
 
 ### 5.6 Home-screen widgets
 "Up Next" in two sizes (2×2, 4×2, resizable): date header, next 3–5 items with category color dots, countdown badges, task filtering, follows system dark mode, 30-minute auto-refresh, refresh-on-data-change, tap opens the app. Rendered headlessly via `widget-task-handler` reading SQLite directly.
@@ -164,7 +161,7 @@ Xiaomi HyperOS silently sabotages background apps. Through documentation researc
 | **Notification auto-grouping** | Multiple alarms auto-grouped into a *SILENT* summary — no sound, no heads-up, no FSI | Per-alarm `setGroup` + `GROUP_ALERT_ALL` |
 | **adb appops grants get reset** by MIUI | Scripted grants don't stick for FSI/overlay | Manual Settings toggles (hub deep-links each); documented |
 
-Useful discoveries: `persist.sys.feature.island=1` (island supported), `notification_focus_protocol=3` (OS3 Super Island), the real autostart intent `miui.intent.action.OP_AUTO_START` + `package_name` extra (replaces the wrong-section MIUI screen), the `canShowFocus` ContentProvider call to query HyperIsland permission state — and the decisive one: **XMSF's island whitelist is an online check**. `FocusNotifUtils: canShowFocus: true` passes locally, yet custom content is discarded after `FocusPlugin: onAuthFailed` — XMSF phones home. Blocking XMSF's network for ~1 s around posting (UID firewall rule via Shizuku) makes the check fail open and the payload render, proven by SystemUI's `DynamicIslandEventCoordinator` picking up the data.
+Useful discoveries: the real autostart intent `miui.intent.action.OP_AUTO_START` + `package_name` extra (replaces the wrong-section MIUI screen), the `canShowFocus` ContentProvider call to query HyperIsland permission state
 
 ---
 
@@ -178,7 +175,7 @@ The app was driven over ADB through every screen with screenshot review:
 - Theme switch (dark → light → dark) applying instantly across all screens
 - ICS screen flows, event detail, edit/delete surfaces
 - **Alarm live-fire test**: armed a test alarm, left the app to the home screen, and the **full-screen alarm fired at the exact scheduled second** — display takeover, ringtone, vibration, Done/Snooze — with the heads-up notification stacked above. Verified multiple times, including from a killed process.
-- **Super Island (v1.2.0)**: the next event renders on the real system island — verified three ways: (1) SystemUI's `DynamicIslandEventCoordinator` log holds the full payload (`"title":"Test5","content":"Tomorrow · 12:00 AM"` + right area `"in 15h 53m"`); (2) differential pixel analysis of the camera region — 58% dark blob with the island posted vs **0.0%** after cancel; (3) the full firewall cycle in logcat: `blockXmsf → island posted → restoreXmsf` within 1 second. Also verified the Shizuku stack end-to-end: server started via `libshizuku.so`, XCalendar granted, UserService bound and executing privileged firewall calls.
+- **v1.3.0 removal verification**: fresh install with zero island/Shizuku code in the APK manifest (aapt-verified), test alarm fired to the second through the plain pipeline, settings hub renders without island entries, no firewall/dead-man logs.
 - **Alarm-safety regression check**: the "Send test alarm" button no longer wipes armed reminders (addAlarm instead of replaceAll) — confirmed by the scheduler re-arming 14–15 items after every app open.
 
 ---
@@ -194,8 +191,8 @@ The app was driven over ADB through every screen with screenshot review:
 7. **Widget config plugin format** — cell counts vs `dp` strings (`"150dp"`), `resizeMode` pipe syntax, missing periodic update → corrected manifest generation.
 8. **Flaky local VPN proxy** intercepting Gradle downloads — builds bypass the system proxy; dl.google.com/Maven Central are reachable directly.
 9. **v1.1.0 audit fixes** — the test alarm wiped all armed reminders (`replaceAll`); all-day reminders fired at midnight; multi-day spans fired once per day; edited titles left stale alarm content; export→import duplicated every event (random UIDs); recurring tasks never recurred; recurring timed events vanished from Day view (RRULE window end anchored at midnight). All fixed with regression tests.
-10. **Super Island whitelist (v1.2.0)** — the payload was delivered intact (`focusType=PARAMS`) yet parsed to `{}`: Xiaomi's XMSF verifies the app signature *online* and discards unlisted apps' content. Defeated via the Shizuku XMSF-network block. Two sub-bugs en route: in-app reflection on `IConnectivityManager` is blocked by Android's hidden-API enforcement (solved by running the reflection inside the Shizuku UserService process, where it's unrestricted), and the restore call threw `NetworkOnMainThreadException` (the connectivity service destroys the blocked UID's sockets when the chain is re-enabled — fixed by enabling the chain only on block and retrying the rule once).
-12. **v1.2.1 hardening** — the 1-second XMSF block window had a crash-window failure mode: a process death between block and the delayed restore would leave XMSF offline indefinitely. Now triple-covered: a persisted blocked-marker restored unconditionally on next app start (live-verified: force-stop inside the window → relaunch → `dead-man restore … restored=true`), a 30-second exact-alarm failsafe receiver for real crashes, and a JS+native double dedupe (persisted payload identity + 60-second throttle) so identical island content never re-posts. Also: UserService version now derives from the app versionCode (no manual bump), firewall reflection matches exact parameter signatures, and the OS3 payload builders moved into one shared `XFocusPayload`.
+10. **Super Island whitelist (v1.2.0; feature removed in v1.3.0)** — the payload was delivered intact (`focusType=PARAMS`) yet parsed to `{}`: Xiaomi's XMSF verifies the app signature *online* and discards unlisted apps' content. Defeated via the Shizuku XMSF-network block. Two sub-bugs en route: in-app reflection on `IConnectivityManager` is blocked by Android's hidden-API enforcement (solved by running the reflection inside the Shizuku UserService process, where it's unrestricted), and the restore call threw `NetworkOnMainThreadException` (the connectivity service destroys the blocked UID's sockets when the chain is re-enabled — fixed by enabling the chain only on block and retrying the rule once).
+12. **v1.2.1 hardening (superseded by the v1.3.0 removal)** — the 1-second XMSF block window had a crash-window failure mode: a process death between block and the delayed restore would leave XMSF offline indefinitely. Now triple-covered: a persisted blocked-marker restored unconditionally on next app start (live-verified: force-stop inside the window → relaunch → `dead-man restore … restored=true`), a 30-second exact-alarm failsafe receiver for real crashes, and a JS+native double dedupe (persisted payload identity + 60-second throttle) so identical island content never re-posts. Also: UserService version now derives from the app versionCode (no manual bump), firewall reflection matches exact parameter signatures, and the OS3 payload builders moved into one shared `XFocusPayload`.
 11. Smaller ones: missing `GestureHandlerRootView`, raw-text children in Views (RN 0.86 drops them silently), Android `contentOffset` being iOS-only, `expo-notifications` channel `sound: "default"` rejection, a WAV generator precedence bug producing 44-byte files.
 
 ---
@@ -203,8 +200,8 @@ The app was driven over ADB through every screen with screenshot review:
 ## 9. Release
 
 - **Repo**: `github.com/aliahadmd/xcalendar` (private, branch `main`)
-- **Releases**: `v1.0.0` (initial) · `v1.1.0` (audit fixes + test baseline) · `v1.2.0` (Super Island) · `v1.2.1` (island safety hardening) — each with the debug-signed arm64 APK attached (≈116 MB, personal sideloading)
-- **Installed**: running on the target phone with all HyperOS permissions green, live reminders armed, Shizuku-powered island active
+- **Releases**: `v1.0.0` (initial) · `v1.1.0` (audit fixes + test baseline) · `v1.2.0` (Super Island) · `v1.2.1` (island safety hardening) · `v1.3.0` (Super Island + Shizuku removed; standalone again) — each with the debug-signed arm64 APK attached (≈116 MB, personal sideloading)
+- **Installed**: running on the target phone (fresh install on v1.3.0); the one-time HyperOS permission grants (autostart, background windows, pop-up windows, battery) need re-doing after any reinstall
 - **Rebuild**: `npm install` → `npx expo prebuild --platform android --clean` → `cd android && ./gradlew assembleRelease` (in-place rebuild preserves the local debug-signing config in `android/app/build.gradle`; `android/` is gitignored)
 - **Verification**: `npm run typecheck` · `npm run test` (vitest, 21 tests)
 
@@ -213,13 +210,11 @@ The app was driven over ADB through every screen with screenshot review:
 ## 10. Known Limitations & Future Ideas
 
 - Reminder window is 14 days ahead (max 60 alarms); longer-horizon reminders reschedule as time advances — by design.
-- **The island depends on Shizuku**: after every phone reboot the Shizuku server must be restarted (one adb command from the Mac, or wireless debugging in the Shizuku app). Until then the island falls back to a plain notification card and the workaround simply doesn't engage — alarms are unaffected.
-- The island countdown text refreshes on app open / data change, not per-minute live ticking (each refresh costs XMSF ~1 s offline; identical payloads are deduped natively and rapid saves are throttled to one post per minute).
 - Custom alarm sound is the system alarm ringtone; a bundled custom alarm tone could be added.
 - Widget refreshes on data change, widget add, and every 30 minutes; a mid-night-tick background refresh could sharpen the date header.
 - Recurrence editing scope: editing a single occurrence of a series edits the whole series (no per-instance exceptions yet).
 - Categories are fixed to the seeded six; user-managed categories are a natural next step.
-- Potential future: per-minute island updates via `sequence`, natural-language quick-add, week-ahead agenda widget, backup/restore beyond ICS, Wear OS complication.
+- Potential future: natural-language quick-add, week-ahead agenda widget, backup/restore beyond ICS, Wear OS complication. (The Super Island integration lives on in git history at tag `v1.2.1` if ever revived.)
 
 ---
 

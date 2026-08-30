@@ -6,17 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.Icon
 import android.media.RingtoneManager
-import android.os.Bundle
-import android.provider.Settings
 import androidx.core.app.NotificationCompat
-import org.json.JSONObject
 
 object XAlarmNotifier {
     const val CHANNEL_ID = "xcalendar_alarms"
-    const val TEST_CHANNEL_ID = "xcalendar_island_test"
-    private const val ISLAND_TEST_NOTIF_ID = 910001
 
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -39,104 +33,6 @@ object XAlarmNotifier {
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         nm.createNotificationChannel(channel)
-    }
-
-    /** Silent channel used only for Super Island rendering tests. */
-    private fun ensureTestChannel(context: Context) {
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(
-            NotificationChannel(
-                TEST_CHANNEL_ID,
-                "Super Island test",
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply { description = "Silent test notifications for Super Island rendering" },
-        )
-    }
-
-    /**
-     * HyperOS focus-notification protocol:
-     * 0 = none · 1 = OS1 focus · 2 = OS2 focus · 3 = OS3 Super Island.
-     */
-    fun focusProtocol(context: Context): Int = try {
-        Settings.System.getInt(context.contentResolver, "notification_focus_protocol", 0)
-    } catch (e: Exception) {
-        0
-    }
-
-    /** Island hardware capability (persist.sys.feature.island). */
-    fun islandSupported(context: Context): Boolean = try {
-        val clazz = Class.forName("android.os.SystemProperties")
-        val m = clazz.getDeclaredMethod("getBoolean", String::class.java, Boolean::class.javaPrimitiveType)
-        (m.invoke(null, "persist.sys.feature.island", false) as? Boolean) ?: false
-    } catch (e: Exception) {
-        false
-    }
-
-    /** Legacy OS2 focus-notification payload (reverse-engineered, pre-Super-Island devices). */
-    private fun buildV2Param(title: String, body: String): String {
-        val baseInfo = JSONObject()
-            .put("type", 1)
-            .put("title", title)
-            .put("content", body)
-            .put("extraTitle", "Reminder")
-        val paramIsland = JSONObject()
-            .put("islandPriority", 3)
-            .put("needCloseAnimation", true)
-        val paramV2 = JSONObject()
-            .put("business", "xcalendar_alarm")
-            .put("ticker", "⏰ $title")
-            .put("enableFloat", true)
-            .put("isShowNotification", true)
-            .put("islandFirstFloat", true)
-            .put("paramIsland", paramIsland)
-            .put("baseInfo", baseInfo)
-        return JSONObject().put("paramV2", paramV2).toString()
-    }
-
-    /**
-     * miui.focus.param JSON matching the device's HyperOS version, or null.
-     * Attached to the built notification via extras.putString (toolkit contract —
-     * passing it through Builder.addExtras is not honored by SystemUI).
-     */
-    fun focusParamJson(context: Context, title: String, body: String, updatable: Boolean): String? {
-        if (!XAlarmScheduler.isXiaomi()) return null
-        return try {
-            val protocol = focusProtocol(context)
-            android.util.Log.d(
-                "XCalendarAlarm",
-                "focusParamJson: protocol=$protocol island=${islandSupported(context)} xiaomi=true",
-            )
-            when {
-                protocol >= 3 -> XFocusPayload.alarmV3Param(title, body, updatable).also {
-                    android.util.Log.d("XCalendarAlarm", "V3 payload (${it.length}B): $it")
-                }
-                protocol == 2 -> buildV2Param(title, body)
-                else -> null
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("XCalendarAlarm", "focusParamJson failed", e)
-            null
-        }
-    }
-
-    /** miui.focus.pics bundle with the island icon (HyperOS 3 only), or null. */
-    private fun focusPicsBundle(context: Context): Bundle? {
-        if (!XAlarmScheduler.isXiaomi() || focusProtocol(context) < 3) return null
-        return try {
-            Bundle().apply {
-                putBundle(
-                    "miui.focus.pics",
-                    Bundle().apply {
-                        putParcelable(
-                            XFocusPayload.ISLAND_PIC,
-                            Icon.createWithResource(context, context.applicationInfo.icon),
-                        )
-                    },
-                )
-            }
-        } catch (e: Exception) {
-            null
-        }
     }
 
     fun buildFireNotification(
@@ -194,7 +90,7 @@ object XAlarmNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(context.applicationInfo.icon)
             .setContentTitle(title)
             .setContentText(body)
@@ -212,63 +108,6 @@ object XAlarmNotifier {
             .setTimeoutAfter(30 * 60_000L)
             .addAction(0, "✓ Done", donePi)
             .addAction(0, "Snooze 10 min", snoozePi)
-
-        focusPicsBundle(context)?.let { builder.addExtras(it) }
-        val notification = builder.build()
-        // miui.focus.param must land on the built notification's extras —
-        // Builder.addExtras does not deliver it to SystemUI.
-        focusParamJson(context, title, body, updatable = false)?.let {
-            notification.extras.putString("miui.focus.param", it)
-        }
-        return notification
-    }
-
-    /**
-     * Post (or update) a persistent silent notification rendered on the Super
-     * Island — a rendering harness for HyperOS 3. Re-posting with the same id
-     * updates the island content live (updatable = true).
-     */
-    fun postIslandTest(context: Context, title: String, body: String): Boolean {
-        try {
-            if (!XAlarmScheduler.isXiaomi() || focusProtocol(context) < 3) return false
-            ensureTestChannel(context)
-            val openApp = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent()
-            val contentPi = PendingIntent.getActivity(
-                context,
-                910002,
-                openApp,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-            val builder = NotificationCompat.Builder(context, TEST_CHANNEL_ID)
-                .setSmallIcon(context.applicationInfo.icon)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setContentIntent(contentPi)
-            focusPicsBundle(context)?.let { builder.addExtras(it) }
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val notification = builder.build()
-            focusParamJson(context, title, body, updatable = true)?.let {
-                notification.extras.putString("miui.focus.param", it)
-            }
-            nm.notify(ISLAND_TEST_NOTIF_ID, notification)
-            android.util.Log.d("XCalendarAlarm", "island test notification posted")
-            return true
-        } catch (e: Exception) {
-            android.util.Log.e("XCalendarAlarm", "postIslandTest failed", e)
-            return false
-        }
-    }
-
-    /** Remove the island test notification (also clears it from the island). */
-    fun cancelIslandTest(context: Context): Boolean {
-        return try {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(ISLAND_TEST_NOTIF_ID)
-            true
-        } catch (e: Exception) {
-            false
-        }
+            .build()
     }
 }

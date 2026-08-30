@@ -82,15 +82,3 @@ class XAlarmBootReceiver : BroadcastReceiver() {
         }
     }
 }
-
-/**
- * 30-second failsafe for the XMSF block window: if the app died between
- * blockXmsf() and the 1 s delayed restore, this alarm restarts the process
- * and restores XMSF's network. Also retries on every subsequent app start
- * via [XShizukuFirewall.restoreIfBlocked].
- */
-class XMsfRestoreReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        XShizukuFirewall.restoreIfBlocked(context)
-    }
-}

@@ -7,26 +7,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONObject
-
-fun focusPermissionState(context: Context): Boolean {
-    return try {
-        val bundle = context.contentResolver.call(
-            Uri.parse("content://miui.statusbar.notification.public"),
-            "canShowFocus",
-            null,
-            Bundle().apply { putString("package", context.packageName) },
-        )
-        bundle?.getBoolean("canShowFocus", false) ?: false
-    } catch (e: Exception) {
-        false
-    }
-}
 
 class XCalendarAlarmModule : Module() {
     private val context: Context
@@ -87,12 +72,8 @@ class XCalendarAlarmModule : Module() {
                         "fullScreenIntent" to canFsi,
                         "overlay" to Settings.canDrawOverlays(ctx),
                         "exactAlarm" to canExact,
-                        "focus" to focusPermissionState(ctx),
                         "batteryIgnoring" to pm.isIgnoringBatteryOptimizations(ctx.packageName),
                         "isXiaomi" to XAlarmScheduler.isXiaomi(),
-                        // HyperOS focus protocol: 0 none · 1 OS1 · 2 OS2 · 3 OS3 Super Island
-                        "focusProtocol" to XAlarmNotifier.focusProtocol(ctx),
-                        "islandSupported" to XAlarmNotifier.islandSupported(ctx),
                     ),
                 )
             } catch (e: Exception) {
@@ -202,64 +183,6 @@ class XCalendarAlarmModule : Module() {
                     false
                 }
             }
-        }
-
-        /** Post (or update) a persistent silent notification rendered on the Super Island. */
-        Function("postIslandTest") { title: String, body: String ->
-            XAlarmNotifier.postIslandTest(context, title, body)
-        }
-
-        /** Remove the Super Island test notification (also clears the island). */
-        Function("cancelIslandTest") {
-            XAlarmNotifier.cancelIslandTest(context)
-        }
-
-        /**
-         * Route C1 — native Super Island for the next event. Posts a persistent
-         * focus notification; when Shizuku is available it applies the XMSF
-         * network workaround so custom content renders without Xiaomi's whitelist.
-         */
-        Function("postIsland") { data: Map<String, Any> ->
-            XIslandPoster.post(context, data)
-        }
-
-        /** Remove the persistent next-event island notification. */
-        Function("cancelIsland") {
-            XIslandPoster.cancel(context)
-        }
-
-        /** Shizuku state for the whitelist workaround. */
-        Function("getShizukuState") {
-            mapOf(
-                "installed" to XShizukuFirewall.isShizukuInstalled(context),
-                "running" to XShizukuFirewall.isShizukuRunning(),
-                "granted" to XShizukuFirewall.isPermissionGranted(),
-                "ready" to XIslandPoster.shizukuReady(context),
-            )
-        }
-
-        /**
-         * Dead-man's switch: restores XMSF's network if a previous island post
-         * blocked it and the app died inside the 1 s window. Called on app start.
-         */
-        AsyncFunction("restoreIfBlocked") { promise: expo.modules.kotlin.Promise ->
-            try {
-                XShizukuFirewall.restoreIfBlocked(context)
-                promise.resolve(null)
-            } catch (e: Exception) {
-                promise.reject("RESTORE_FAILED", e.message, e)
-            }
-        }
-
-        /** Open the Shizuku permission dialog for this app. */
-        Function("requestShizukuPermission") {
-            XShizukuFirewall.requestPermission()
-            true
-        }
-
-        /** Whether this device supports the native Super Island at all. */
-        Function("isIslandSupported") {
-            XIslandPoster.isSupported(context)
         }
 
         /** Schedules a real alarm ~8 seconds out through the full pipeline — for testing. */

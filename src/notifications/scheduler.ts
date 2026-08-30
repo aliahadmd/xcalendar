@@ -82,7 +82,7 @@ let lastSignature = "";
 
 /**
  * Push the next 14 days of reminders into the native alarm pipeline
- * (AlarmManager.setAlarmClock + full-screen alarm screen + HyperIsland).
+ * (AlarmManager.setAlarmClock + full-screen alarm screen).
  * Native side atomically replaces its whole pending set.
  */
 export async function rescheduleAll(): Promise<void> {

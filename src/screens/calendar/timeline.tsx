@@ -293,7 +293,6 @@ function DayColumn({
           return (
             <PressScale
               key={b.occ.instanceId}
-              hapticKind="selection"
               onPress={() => onPressOccurrence(b.occ)}
               scaleTo={0.97}
               containerStyle={{
@@ -360,7 +359,7 @@ function AllDayChip({
   const theme = useTheme();
   const color = eventColor(occ.event, categories, theme.isDark);
   return (
-    <PressScale hapticKind="selection" onPress={onPress} scaleTo={0.96}>
+    <PressScale onPress={onPress} scaleTo={0.96}>
       <View
         style={{
           backgroundColor: `${color}33`,

@@ -1,7 +1,5 @@
 import React, { useCallback } from "react";
 import { Pressable, PressableProps, StyleProp, ViewStyle, Animated, useAnimatedValue } from "react-native";
-import { useTheme } from "@/theme/theme";
-import { haptic, type HapticKind } from "@/utils/haptics";
 
 interface Props extends Omit<PressableProps, "onPress"> {
   onPress?: () => void;
@@ -10,18 +8,16 @@ interface Props extends Omit<PressableProps, "onPress"> {
   /** Style for the outer touchable (layout/position); `style` stays on the scaling view. */
   containerStyle?: StyleProp<ViewStyle>;
   scaleTo?: number;
-  hapticKind?: HapticKind | null;
   children: React.ReactNode;
 }
 
-/** Apple-like pressable: springs down on press, haptic feedback, merges style last. */
+/** Apple-like pressable: springs down on press, merges style last. */
 export function PressScale({
   onPress,
   onLongPress,
   style,
   containerStyle,
   scaleTo = 0.96,
-  hapticKind = "light",
   children,
   ...rest
 }: Props) {
@@ -40,14 +36,8 @@ export function PressScale({
 
   return (
     <Pressable
-      onPress={() => {
-        if (hapticKind) haptic(hapticKind);
-        onPress?.();
-      }}
-      onLongPress={() => {
-        if (hapticKind) haptic("medium");
-        onLongPress?.();
-      }}
+      onPress={() => onPress?.()}
+      onLongPress={() => onLongPress?.()}
       onPressIn={() => animate(scaleTo)}
       onPressOut={() => animate(1)}
       style={containerStyle}

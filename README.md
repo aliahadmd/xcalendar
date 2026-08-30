@@ -1,6 +1,6 @@
 # XCalendar
 
-A minimal, Apple-style personal calendar built with **Expo SDK 57** — optimized for a **Xiaomi Redmi K80 Pro** (Android 16, 2K 120Hz). Fully standalone: **no external dependencies, no companion apps** (Shizuku-free since v1.3.0).
+A minimal, Apple-style personal calendar built with **Expo SDK 57** — optimized for a **Xiaomi Redmi K80 Pro** (Android 16, 2K 120Hz). Fully standalone: **no external dependencies, no companion apps, no extra permissions** beyond what alarms and widgets require.
 
 ## Features
 
@@ -10,7 +10,6 @@ A minimal, Apple-style personal calendar built with **Expo SDK 57** — optimize
 - **Recurrence** — daily / weekly / monthly / yearly (RRULE-based, imports Google Calendar rules)
 - **Reminders** — exact alarms via the native alarm pipeline, rolling 14-day scheduler, per-event offsets (At time / 5 min / 30 min / 1 hour / 1 day)
 - **Today tab** — greeting, task progress, overdue tasks, today's agenda
-- **Haptics + sounds** — custom tick / complete / save / delete UI sounds, Apple-style haptic feedback (both toggleable)
 - **Theme** — System / Light / Dark, applied instantly
 - **ICS** — export the whole calendar (with alarms) or import from any `.ics` (Google/Apple/Outlook), UID-deduplicated
 - **Widget** — "Up Next" home-screen widget (small + large) that follows system dark mode
@@ -46,9 +45,8 @@ HyperOS still requires **one-time manual permission grants** (Settings → "Alar
 
 Use **Settings → Alarms & reminders → "Send test alarm (8 seconds)"** to verify the whole pipeline end-to-end at any time.
 
-> **Note:** versions 1.2.0–1.2.1 could additionally mirror the next event onto HyperOS 3's Super Island via a Shizuku-based workaround. That feature was **removed in v1.3.0** — it depended on a companion app (Shizuku) and manipulated the system XMSF service's network at runtime, which was more machinery than a personal calendar wants. The island code remains in git history (`v1.2.1`) if it's ever wanted back.
+> **History:** v1.2.0–v1.2.1 could mirror the next event onto HyperOS 3's Super Island via a Shizuku-based workaround (removed in v1.3.0). Through v1.2.1 the app also had haptic feedback and custom UI sounds (removed in v1.4.0). Both live on in git history.
 
 ## Scripts
 
-- `node scripts/generate-sounds.js` — regenerates the bundled UI sounds (`assets/sounds/*.wav`)
 - `npm run test` / `npm run typecheck` — vitest suite (occurrence engine, reminder scheduler, date utils) and TypeScript

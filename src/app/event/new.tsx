@@ -20,8 +20,6 @@ import { useCategories, useSettings } from "@/hooks/use-data";
 import { defaultEvent, getEvents, saveEvent, deleteEvent } from "@/db/repo";
 import type { CalendarEvent, EventType } from "@/db/types";
 import { eventColor } from "@/calendar/display";
-import { haptic } from "@/utils/haptics";
-import { playSound } from "@/utils/sound";
 import { toLocalDateStr, parseLocalDate, todayStr, addDateStr } from "@/utils/date";
 
 const TYPE_OPTIONS: { type: EventType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -108,30 +106,23 @@ export default function EventFormScreen() {
   const canSave = !!event && event.title.trim().length > 0;
 
   const discard = () => {
-    haptic("light");
     router.back();
   };
 
   const save = async () => {
     if (!event || !canSave) return;
-    haptic("success");
-    playSound("save");
     await saveEvent({ ...event, title: event.title.trim(), updatedAt: Date.now() });
     router.back();
   };
 
   const remove = async () => {
     if (!event) return;
-    haptic("warning");
-    playSound("delete");
     await deleteEvent(event.id);
     router.back();
   };
 
   const changeType = (type: EventType) => {
     if (!event) return;
-    haptic("selection");
-    playSound("tick");
     if (type === "countdown") {
       patch({ type, targetDate: event.dtstartDate ?? todayStr(), dtstartDate: null, startAt: null, endAt: null, reminders: [] });
     } else if (type === "birthday") {
@@ -160,7 +151,7 @@ export default function EventFormScreen() {
           headerStyle: { backgroundColor: theme.colors.bgElevated },
           headerTintColor: theme.colors.label,
           headerLeft: () => (
-            <PressScale onPress={discard} hapticKind={null} scaleTo={0.92}>
+            <PressScale onPress={discard} scaleTo={0.92}>
               <ThemedText variant="body" style={{ color: theme.colors.accent }}>
                 Cancel
               </ThemedText>
@@ -169,7 +160,6 @@ export default function EventFormScreen() {
           headerRight: () => (
             <PressScale
               onPress={save}
-              hapticKind={null}
               scaleTo={0.92}
               style={{ opacity: canSave ? 1 : 0.4 }}
             >
@@ -226,7 +216,6 @@ export default function EventFormScreen() {
                   icon={c.icon as any}
                   label={c.name}
                   onPress={() => {
-                    haptic("selection");
                     patch({ categoryId: active ? null : c.id });
                   }}
                 />
@@ -250,7 +239,6 @@ export default function EventFormScreen() {
                 label="All-day"
                 value={event.allDay}
                 onChange={(v) => {
-                  haptic("selection");
                   if (v) {
                     patch({
                       allDay: true,
@@ -312,7 +300,6 @@ export default function EventFormScreen() {
                     icon="repeat-outline"
                     label={r.label}
                     onPress={() => {
-                      haptic("selection");
                       patch({ recurrence: r.value });
                     }}
                   />
@@ -341,7 +328,6 @@ export default function EventFormScreen() {
                     color={active ? theme.colors.accent : undefined}
                     label={r.label}
                     onPress={() => {
-                      haptic("selection");
                       patch({
                         reminders: active
                           ? event.reminders.filter((x) => x !== r.value)
@@ -369,7 +355,7 @@ export default function EventFormScreen() {
         </View>
 
         {isEdit && (
-          <PressScale onPress={remove} hapticKind={null} scaleTo={0.98} containerStyle={{ marginHorizontal: 16, marginTop: 16 }}>
+          <PressScale onPress={remove} scaleTo={0.98} containerStyle={{ marginHorizontal: 16, marginTop: 16 }}>
             <View style={[styles.card, { backgroundColor: `${theme.colors.destructive}18`, paddingVertical: 14 }]}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 <Ionicons name="trash-outline" size={18} color={theme.colors.destructive} />
@@ -390,7 +376,6 @@ export default function EventFormScreen() {
           onChange={(_, d) => {
             if (Platform.OS === "android") setShowDatePicker(false);
             if (!d) return;
-            haptic("selection");
             if (event.type === "countdown") patch({ targetDate: toLocalDateStr(d) });
             else if (event.allDay) patch({ dtstartDate: toLocalDateStr(d) });
             else {
@@ -411,7 +396,6 @@ export default function EventFormScreen() {
           onChange={(_, d) => {
             if (Platform.OS === "android") setShowStartPicker(false);
             if (!d) return;
-            haptic("selection");
             const s = new Date(event.startAt ?? Date.now());
             // Keep the existing duration — changing the start must not reset the end.
             const prevDur =
@@ -431,7 +415,6 @@ export default function EventFormScreen() {
           onChange={(_, d) => {
             if (Platform.OS === "android") setShowEndPicker(false);
             if (!d) return;
-            haptic("selection");
             const e2 = new Date(d);
             if (e2.getTime() <= (event.startAt ?? 0)) {
               e2.setDate(e2.getDate() + 1);
@@ -459,7 +442,7 @@ function Chip({
 }) {
   const theme = useTheme();
   return (
-    <PressScale onPress={onPress} hapticKind={null} scaleTo={0.94}>
+    <PressScale onPress={onPress} scaleTo={0.94}>
       <View
         style={{
           flexDirection: "row",
@@ -503,7 +486,7 @@ function Row({
 }) {
   const theme = useTheme();
   return (
-    <PressScale onPress={onPress} hapticKind="selection" scaleTo={0.99} containerStyle={{ width: "100%" }}>
+    <PressScale onPress={onPress} scaleTo={0.99} containerStyle={{ width: "100%" }}>
       <View style={[styles.row, { borderBottomColor: theme.colors.fill }]}>
         <View style={styles.rowIcon}>
           <Ionicons name={icon} size={20} color={theme.colors.label2} />

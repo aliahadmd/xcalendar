@@ -56,8 +56,6 @@ export interface Occurrence {
 
 export interface AppSettings {
   themeMode: "system" | "light" | "dark";
-  soundsOn: boolean;
-  hapticsOn: boolean;
   use24h: boolean;
   weekStartsOn: 0 | 1;
   defaultReminders: number[];

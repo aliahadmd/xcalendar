@@ -4,8 +4,6 @@ import type { AppSettings } from "./types";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   themeMode: "system",
-  soundsOn: true,
-  hapticsOn: true,
   use24h: false,
   weekStartsOn: 1,
   defaultReminders: [30],
@@ -18,13 +16,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
 type SettingsListener = (s: AppSettings) => void;
 const listeners = new Set<SettingsListener>();
 let settingsCache: AppSettings | null = null;
-
-/** Synchronous read of last-known settings (null before first load). */
-export const settingsRef: { current: AppSettings | null } = {
-  get current() {
-    return settingsCache;
-  },
-};
 
 export async function loadSettings(): Promise<AppSettings> {
   if (settingsCache) return settingsCache;

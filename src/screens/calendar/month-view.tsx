@@ -125,7 +125,6 @@ function DayCell({
     <PressScale
       onPress={onSelect}
       onLongPress={onLongPress}
-      hapticKind={null}
       scaleTo={0.9}
       containerStyle={styles.cell}
     >
@@ -183,7 +182,7 @@ function DayAgenda({
     <View style={[styles.agendaCard, { backgroundColor: theme.colors.card }]}>
       <View style={styles.agendaHeader}>
         <ThemedText variant="title2">{title}</ThemedText>
-        <PressScale onPress={onQuickAdd} hapticKind="light" style={{ padding: 4 }}>
+        <PressScale onPress={onQuickAdd} style={{ padding: 4 }}>
           <ThemedText variant="subheadline" style={{ color: theme.colors.accent }}>
             + Add
           </ThemedText>

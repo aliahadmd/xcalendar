@@ -1,8 +1,8 @@
 # XCalendar — Project Report
 
-**Version 1.3.0 · August 31, 2026 · Android**
+**Version 1.4.0 · August 31, 2026 · Android**
 
-A minimal, Apple-style personal calendar application, purpose-built for a single user's Xiaomi Redmi K80 Pro — with an uncompromising, aggressively reliable reminder system as the centerpiece. Fully standalone: no companion apps, no external privileges (the Shizuku-based Super Island integration of v1.2.x was removed in v1.3.0).
+A minimal, Apple-style personal calendar application, purpose-built for a single user's Xiaomi Redmi K80 Pro — with an uncompromising, aggressively reliable reminder system as the centerpiece. Deliberately lean: no companion apps, no external privileges (v1.3.0 removed the Shizuku-based Super Island integration), and no haptics or UI sounds (v1.4.0).
 
 ---
 
@@ -20,11 +20,11 @@ Success criteria, all met:
 | Schedule Events, Birthdays, Countdowns, Tasks (work/study/business/personal categories) | ✅ |
 | Aggressive, reliable alarms on Xiaomi HyperOS | ✅ (live-verified on device) |
 | Apple-like minimal design, dark/light/system themes | ✅ |
-| Haptics + modern sounds | ✅ |
+| ~~Haptics + modern sounds~~ | removed in v1.4.0 (kept the app lean) |
 | SQLite storage | ✅ |
 | ICS export/import | ✅ |
 | Home-screen widget | ✅ |
-| Zero external dependencies / companion apps | ✅ (v1.3.0 — Super Island + Shizuku removed) |
+| Zero external dependencies / companion apps | ✅ (v1.3.0 island + Shizuku; v1.4.0 haptics + sounds) |
 | Personal use — no app-store constraints, "go full aggressive" on permissions | ✅ |
 
 ---
@@ -56,8 +56,6 @@ The phone was connected via ADB for the entire project, which enabled **on-devic
 | Widgets | **react-native-android-widget** | Actively maintained, Expo config-plugin support |
 | Date math | **date-fns** | Tree-shakeable, reliable |
 | Type | **Inter** (@expo-google-fonts) | Closest free match to Apple's SF Pro on Android |
-| Haptics | **expo-haptics** | Selection / impact / notification feedback mapped to interactions |
-| Sounds | **expo-audio** + custom-generated WAVs (`scripts/generate-sounds.js`) | 4 tiny synthesized UI sounds (tick / complete / save / delete) — zero licensing weight |
 | Icons | @expo/vector-icons (Ionicons) | Broad coverage, consistent style |
 
 ---
@@ -80,7 +78,7 @@ src/
 ├── theme/                # design tokens: colors (light/dark), type ramp, spacing, motion
 ├── components/           # ThemedText, PressScale, SegmentedControl, EventRow…
 ├── core/                 # app orchestrator (init + change side-effects)
-└── utils/                # date (local-date-string safety), haptics, sound
+└── utils/                # date (local-date-string safety)
 
 modules/xcalendar-alarm/  # native Kotlin: scheduler, receiver, full-screen
                           # alarm activity, action receiver, boot receiver
@@ -100,7 +98,7 @@ widget-task-handler.tsx   # widget headless entry (project root, per plugin cont
 - **Week** — 7-column 24-hour timeline with hour grid, colored event blocks with overlap lanes, live red current-time line, all-day strip, tap any slot to create an event at that exact 15-minute increment.
 - **Day** — single-column timeline, all-day chip strip, same interactions.
 - **Year** — 3×4 grid of mini-months with today markers; tap a month to jump into Month view.
-- Segmented Day/Week/Month/Year switcher with haptic tick; last view persisted; chevron stepping; "Today" quick jump.
+- Segmented Day/Week/Month/Year switcher; last view persisted; chevron stepping; "Today" quick jump.
 
 ### 5.2 Scheduling
 - **Four entry types**: Event · Task · Birthday · Countdown — type-aware form behavior (birthdays auto-set yearly recurrence + category; countdowns use a target date with "in X days" everywhere).
@@ -108,8 +106,8 @@ widget-task-handler.tsx   # widget headless entry (project root, per plugin cont
 - **All-day & multi-day** support with correct date-string storage.
 - **Recurrence** — None / Daily / Weekly / Monthly / Yearly (stored as RRULE; expansion capped and DST-safe).
 - **Reminders** — At time / 5 min / 30 min / 1 hour / 1 day before, multi-select per event.
-- **Checkable tasks** — tap the circle to complete: spring animation, strikethrough fade, success haptic + chime, day progress ("1/1 · All done 🎉").
-- **Detail screen** with full metadata; edit reuses the form modal; delete with warning haptic.
+- **Checkable tasks** — tap the circle to complete: spring animation, strikethrough fade, day progress ("1/1 · All done 🎉").
+- **Detail screen** with full metadata; edit reuses the form modal; delete.
 - **Deep links** — `xcalendar://event/new?type=countdown&date=…` prefill the form (validated on device).
 
 ### 5.3 Today tab
@@ -141,8 +139,7 @@ It was **removed in v1.3.0** by design decision: the feature required a companio
 
 ### 5.8 Polish
 - **Themes** — System / Light / Dark with instant switching and a complete Apple-style semantic palette in both modes.
-- **Haptics** — selection ticks on navigation, medium impact on completion, success/warning notification haptics on save/delete; master toggle.
-- **Sounds** — four custom-synthesized UI sounds (tick, complete chime, save sweep, delete thud) generated by a script; master toggle.
+- **Feedback removal (v1.4.0)** — haptic feedback and the four synthesized UI sounds (expo-haptics / expo-audio) were removed to keep the app minimal; interactions now rely on visual spring feedback only (the PressScale press animation survives).
 - **Typography & layout** — Inter-based Apple text ramp, continuous border curves, token-driven spacing/radius/motion.
 - **Settings** — appearance (theme/24h/week start), feedback toggles, the alarms hub, data export/import.
 
@@ -176,6 +173,7 @@ The app was driven over ADB through every screen with screenshot review:
 - ICS screen flows, event detail, edit/delete surfaces
 - **Alarm live-fire test**: armed a test alarm, left the app to the home screen, and the **full-screen alarm fired at the exact scheduled second** — display takeover, ringtone, vibration, Done/Snooze — with the heads-up notification stacked above. Verified multiple times, including from a killed process.
 - **v1.3.0 removal verification**: fresh install with zero island/Shizuku code in the APK manifest (aapt-verified), test alarm fired to the second through the plain pipeline, settings hub renders without island entries, no firewall/dead-man logs.
+- **v1.4.0 removal verification**: clean build with zero audio/haptics traces in the APK (manifest aapt-verified: no RECORD_AUDIO / MODIFY_AUDIO_SETTINGS / AudioControlsService), app boots cleanly (JS runs, Expo modules init, no runtime errors), typecheck + 21/21 tests green.
 - **Alarm-safety regression check**: the "Send test alarm" button no longer wipes armed reminders (addAlarm instead of replaceAll) — confirmed by the scheduler re-arming 14–15 items after every app open.
 
 ---
@@ -193,14 +191,14 @@ The app was driven over ADB through every screen with screenshot review:
 9. **v1.1.0 audit fixes** — the test alarm wiped all armed reminders (`replaceAll`); all-day reminders fired at midnight; multi-day spans fired once per day; edited titles left stale alarm content; export→import duplicated every event (random UIDs); recurring tasks never recurred; recurring timed events vanished from Day view (RRULE window end anchored at midnight). All fixed with regression tests.
 10. **Super Island whitelist (v1.2.0; feature removed in v1.3.0)** — the payload was delivered intact (`focusType=PARAMS`) yet parsed to `{}`: Xiaomi's XMSF verifies the app signature *online* and discards unlisted apps' content. Defeated via the Shizuku XMSF-network block. Two sub-bugs en route: in-app reflection on `IConnectivityManager` is blocked by Android's hidden-API enforcement (solved by running the reflection inside the Shizuku UserService process, where it's unrestricted), and the restore call threw `NetworkOnMainThreadException` (the connectivity service destroys the blocked UID's sockets when the chain is re-enabled — fixed by enabling the chain only on block and retrying the rule once).
 12. **v1.2.1 hardening (superseded by the v1.3.0 removal)** — the 1-second XMSF block window had a crash-window failure mode: a process death between block and the delayed restore would leave XMSF offline indefinitely. Now triple-covered: a persisted blocked-marker restored unconditionally on next app start (live-verified: force-stop inside the window → relaunch → `dead-man restore … restored=true`), a 30-second exact-alarm failsafe receiver for real crashes, and a JS+native double dedupe (persisted payload identity + 60-second throttle) so identical island content never re-posts. Also: UserService version now derives from the app versionCode (no manual bump), firewall reflection matches exact parameter signatures, and the OS3 payload builders moved into one shared `XFocusPayload`.
-11. Smaller ones: missing `GestureHandlerRootView`, raw-text children in Views (RN 0.86 drops them silently), Android `contentOffset` being iOS-only, `expo-notifications` channel `sound: "default"` rejection, a WAV generator precedence bug producing 44-byte files.
+11. Smaller ones: missing `GestureHandlerRootView`, raw-text children in Views (RN 0.86 drops them silently), Android `contentOffset` being iOS-only, `expo-notifications` channel `sound: "default"` rejection, a WAV generator precedence bug producing 44-byte files (moot since v1.4.0 removed the sound system).
 
 ---
 
 ## 9. Release
 
 - **Repo**: `github.com/aliahadmd/xcalendar` (private, branch `main`)
-- **Releases**: `v1.0.0` (initial) · `v1.1.0` (audit fixes + test baseline) · `v1.2.0` (Super Island) · `v1.2.1` (island safety hardening) · `v1.3.0` (Super Island + Shizuku removed; standalone again) — each with the debug-signed arm64 APK attached (≈116 MB, personal sideloading)
+- **Releases**: `v1.0.0` (initial) · `v1.1.0` (audit fixes + test baseline) · `v1.2.0` (Super Island) · `v1.2.1` (island safety hardening) · `v1.3.0` (Super Island + Shizuku removed) · `v1.4.0` (haptics + UI sounds removed) — each with the debug-signed arm64 APK attached (≈116 MB, personal sideloading)
 - **Installed**: running on the target phone (fresh install on v1.3.0); the one-time HyperOS permission grants (autostart, background windows, pop-up windows, battery) need re-doing after any reinstall
 - **Rebuild**: `npm install` → `npx expo prebuild --platform android --clean` → `cd android && ./gradlew assembleRelease` (in-place rebuild preserves the local debug-signing config in `android/app/build.gradle`; `android/` is gitignored)
 - **Verification**: `npm run typecheck` · `npm run test` (vitest, 21 tests)

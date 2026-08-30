@@ -110,7 +110,7 @@ export default function TodayScreen() {
           title="Today"
           accent={theme.colors.accent}
           action={
-            <PressScale onPress={openNew} hapticKind="light" scaleTo={0.9}>
+            <PressScale onPress={openNew} scaleTo={0.9}>
               <Ionicons name="add-circle-outline" size={26} color={theme.colors.accent} />
             </PressScale>
           }

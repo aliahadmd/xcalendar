@@ -14,8 +14,6 @@ import { YearView } from "@/screens/calendar/year-view";
 import { useCategories, useSettings } from "@/hooks/use-data";
 import { addMonths, addDays, addYears, monthTitle, toLocalDateStr, todayStr, startOfWeek } from "@/utils/date";
 import { saveSetting } from "@/db/settings";
-import { haptic } from "@/utils/haptics";
-import { playSound } from "@/utils/sound";
 import type { Occurrence } from "@/db/types";
 
 type CalMode = "day" | "week" | "month" | "year";
@@ -51,14 +49,11 @@ export default function CalendarScreen() {
   );
 
   const changeMode = (m: CalMode) => {
-    haptic("selection");
-    playSound("tick");
     setMode(m);
     saveSetting("lastView", m);
   };
 
   const step = (delta: number) => {
-    haptic("light");
     if (mode === "month") setCursor((c) => addMonths(c, delta));
     else if (mode === "year") setCursor((c) => addYears(c, delta));
     else if (mode === "week") setCursor((c) => addDays(c, delta * 7));
@@ -66,8 +61,6 @@ export default function CalendarScreen() {
   };
 
   const goToday = () => {
-    haptic("light");
-    playSound("tick");
     setCursor(new Date());
     setSelectedDate(todayStr());
   };
@@ -107,7 +100,7 @@ export default function CalendarScreen() {
             {title}
           </ThemedText>
         </View>
-        <PressScale onPress={goToday} hapticKind="light" scaleTo={0.92}>
+        <PressScale onPress={goToday} scaleTo={0.92}>
           <View style={[styles.todayBtn, { backgroundColor: theme.colors.fill }]}>
             <ThemedText variant="subheadline" style={{ color: theme.colors.accent, fontFamily: theme.fonts.semibold }}>
               Today
@@ -118,11 +111,11 @@ export default function CalendarScreen() {
 
       {/* View switcher + arrows */}
       <View style={styles.toolbar}>
-        <PressScale onPress={() => step(-1)} hapticKind={null} scaleTo={0.85} style={styles.arrow}>
+        <PressScale onPress={() => step(-1)} scaleTo={0.85} style={styles.arrow}>
           <Ionicons name="chevron-back" size={22} color={theme.colors.accent} />
         </PressScale>
         <SegmentedControl options={SEGMENTS} value={mode} onChange={changeMode} style={{ flex: 1 }} />
-        <PressScale onPress={() => step(1)} hapticKind={null} scaleTo={0.85} style={styles.arrow}>
+        <PressScale onPress={() => step(1)} scaleTo={0.85} style={styles.arrow}>
           <Ionicons name="chevron-forward" size={22} color={theme.colors.accent} />
         </PressScale>
       </View>
@@ -137,7 +130,6 @@ export default function CalendarScreen() {
             use24h={settings.use24h}
             categories={categories}
             onSelectDate={(d) => {
-              haptic("selection");
               setSelectedDate(d);
             }}
             onLongPressDay={(d) => {
@@ -175,8 +167,6 @@ export default function CalendarScreen() {
             year={cursor.getFullYear()}
             weekStartsOn={settings.weekStartsOn}
             onSelectMonth={(m) => {
-              haptic("medium");
-              playSound("tick");
               setCursor(new Date(cursor.getFullYear(), m, 1));
               setSelectedDate(toLocalDateStr(new Date(cursor.getFullYear(), m, 1)));
               setMode("month");
@@ -189,7 +179,6 @@ export default function CalendarScreen() {
       {/* FAB */}
       <PressScale
         onPress={() => openNew(selectedDate)}
-        hapticKind="medium"
         scaleTo={0.88}
         containerStyle={styles.fabContainer}
         style={[styles.fab, { backgroundColor: theme.colors.accent }]}

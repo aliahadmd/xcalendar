@@ -64,7 +64,7 @@ function MiniMonth({
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
 
   return (
-    <PressScale onPress={onPress} hapticKind="light" scaleTo={0.94} containerStyle={styles.monthCard}>
+    <PressScale onPress={onPress} scaleTo={0.94} containerStyle={styles.monthCard}>
       <ThemedText
         variant="subheadline"
         style={{

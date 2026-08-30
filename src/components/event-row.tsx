@@ -9,9 +9,6 @@ import type { Category } from "@/db/types";
 import { eventColor, ageForBirthday, countdownLabel, isTaskOverdue } from "@/calendar/display";
 import { formatTime, formatTimeRange } from "@/utils/date";
 import { setTaskCompleted } from "@/db/repo";
-import { playSound } from "@/utils/sound";
-import { haptic } from "@/utils/haptics";
-
 interface Props {
   occ: Occurrence;
   categories: Category[];
@@ -41,14 +38,11 @@ export function EventRow({ occ, categories, use24h, onPress, showTime = true }: 
   const toggleTask = () => {
     if (event.type !== "task") return;
     const completed = !event.completedAt;
-    haptic(completed ? "medium" : "light");
-    playSound(completed ? "complete" : "tick");
     setTaskCompleted(event.id, completed ? Date.now() : null);
   };
 
   return (
     <PressScale
-      hapticKind="selection"
       onPress={() => onPress(occ)}
       scaleTo={0.98}
       containerStyle={{ width: "100%" }}
@@ -122,7 +116,6 @@ function TaskCheck({ done, onToggle }: { done: boolean; onToggle: () => void }) 
   return (
     <PressScale
       onPress={onToggle}
-      hapticKind={null}
       scaleTo={0.8}
       style={{
         width: 26,

@@ -11,9 +11,6 @@ import { eventColor, ageForBirthday, countdownLabel } from "@/calendar/display";
 import type { CalendarEvent } from "@/db/types";
 import { parseLocalDate, format, formatTime, formatTimeRange } from "@/utils/date";
 import { setTaskCompleted } from "@/db/repo";
-import { haptic } from "@/utils/haptics";
-import { playSound } from "@/utils/sound";
-
 function recurrenceLabel(rrule: string | null): string | null {
   if (!rrule) return null;
   if (rrule.startsWith("FREQ=DAILY")) return "Repeats daily";
@@ -53,7 +50,7 @@ export default function EventDetailScreen() {
           headerStyle: { backgroundColor: theme.colors.bgElevated },
           headerTintColor: theme.colors.label,
           headerLeft: () => (
-            <PressScale onPress={() => router.back()} hapticKind={null} scaleTo={0.92}>
+            <PressScale onPress={() => router.back()} scaleTo={0.92}>
               <Ionicons name="close" size={24} color={theme.colors.label2} />
             </PressScale>
           ),
@@ -61,10 +58,8 @@ export default function EventDetailScreen() {
             event ? (
               <PressScale
                 onPress={() => {
-                  haptic("light");
                   router.push({ pathname: "/event/new", params: { id: event.id } });
                 }}
-                hapticKind={null}
                 scaleTo={0.92}
               >
                 <ThemedText variant="headline" style={{ color: theme.colors.accent }}>
@@ -133,8 +128,6 @@ function Detail({
 
   const toggleDone = () => {
     if (!isTask) return;
-    haptic(done ? "light" : "medium");
-    playSound(done ? "tick" : "complete");
     setTaskCompleted(event.id, done ? null : Date.now());
   };
 
@@ -143,7 +136,7 @@ function Detail({
       <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
         <View style={styles.titleRow}>
           {isTask && (
-            <PressScale onPress={toggleDone} hapticKind={null} scaleTo={0.8} style={{ marginRight: 12 }}>
+            <PressScale onPress={toggleDone} scaleTo={0.8} style={{ marginRight: 12 }}>
               <View
                 style={{
                   width: 30,

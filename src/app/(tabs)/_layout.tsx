@@ -5,9 +5,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { PressScale } from "@/components/press-scale";
-import { haptic } from "@/utils/haptics";
-import { playSound } from "@/utils/sound";
-
 const ICONS: Record<string, { on: keyof typeof Ionicons.glyphMap; off: keyof typeof Ionicons.glyphMap }> = {
   today: { on: "today", off: "today-outline" },
   calendar: { on: "calendar", off: "calendar-outline" },
@@ -43,12 +40,10 @@ function TabBar({ state, navigation }: { state: any; navigation: any }) {
           <PressScale
             key={route.key}
             scaleTo={0.85}
-            hapticKind="selection"
             containerStyle={styles.tab}
             onPress={() => {
               const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
               if (!focused && !event.defaultPrevented) {
-                playSound("tick");
                 navigation.navigate(route.name);
               }
             }}

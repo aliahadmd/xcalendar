@@ -9,8 +9,6 @@ import { PressScale } from "@/components/press-scale";
 import { SegmentedControl } from "@/components/segmented-control";
 import { useSettings } from "@/hooks/use-data";
 import { saveSetting } from "@/db/settings";
-import { haptic } from "@/utils/haptics";
-import { playSound } from "@/utils/sound";
 import { exportIcs, importIcs } from "@/ics/ics";
 import XCalendarAlarm, {
   type XAlarmPermissionStates,
@@ -34,23 +32,18 @@ export default function SettingsScreen() {
   );
 
   const openBatterySettings = () => {
-    haptic("light");
     XCalendarAlarm.openBatterySettings();
   };
 
   const openAutoStart = () => {
-    haptic("light");
     XCalendarAlarm.openAutostart();
   };
 
   const fireTest = () => {
-    haptic("medium");
-    playSound("save");
     XCalendarAlarm.fireTestAlarm();
   };
 
   const doExport = async () => {
-    haptic("medium");
     setBusy(true);
     try {
       await exportIcs();
@@ -60,7 +53,6 @@ export default function SettingsScreen() {
   };
 
   const doImport = async () => {
-    haptic("medium");
     setBusy(true);
     try {
       const result = await importIcs();
@@ -91,7 +83,6 @@ export default function SettingsScreen() {
               ]}
               value={settings.themeMode}
               onChange={(v) => {
-                haptic("selection");
                 saveSetting("themeMode", v as ThemeMode);
               }}
               style={{ width: 190 }}
@@ -102,7 +93,6 @@ export default function SettingsScreen() {
             label="24-hour time"
             value={settings.use24h}
             onChange={(v) => {
-              haptic("selection");
               saveSetting("use24h", v);
             }}
           />
@@ -111,29 +101,7 @@ export default function SettingsScreen() {
             label="Week starts Monday"
             value={settings.weekStartsOn === 1}
             onChange={(v) => {
-              haptic("selection");
               saveSetting("weekStartsOn", v ? 1 : 0);
-            }}
-          />
-        </Group>
-
-        <Group title="Feedback">
-          <RowSwitch
-            icon="pulse-outline"
-            label="Haptics"
-            value={settings.hapticsOn}
-            onChange={(v) => {
-              saveSetting("hapticsOn", v);
-              if (v) haptic("medium");
-            }}
-          />
-          <RowSwitch
-            icon="volume-medium-outline"
-            label="UI sounds"
-            value={settings.soundsOn}
-            onChange={(v) => {
-              saveSetting("soundsOn", v);
-              if (v) playSound("complete");
             }}
           />
         </Group>
@@ -205,7 +173,7 @@ function StatusRow({
   const theme = useTheme();
   const state = ok === null || ok === undefined ? "unknown" : ok ? "ok" : "off";
   return (
-    <PressScale onPress={onPress} hapticKind="selection" scaleTo={0.99} containerStyle={{ width: "100%" }}>
+    <PressScale onPress={onPress} scaleTo={0.99} containerStyle={{ width: "100%" }}>
       <View style={[styles.row, { borderBottomColor: theme.colors.fill }]}>
         <Ionicons
           name={state === "ok" ? "checkmark-circle" : state === "off" ? "alert-circle" : "help-circle"}
@@ -305,7 +273,7 @@ function ActionRow({
 }) {
   const theme = useTheme();
   return (
-    <PressScale onPress={onPress} hapticKind="selection" scaleTo={0.99} containerStyle={{ width: "100%" }}>
+    <PressScale onPress={onPress} scaleTo={0.99} containerStyle={{ width: "100%" }}>
       <View style={[styles.row, { borderBottomColor: theme.colors.fill }]}>
         <View style={styles.rowIcon}>
           <Ionicons name={icon} size={20} color={theme.colors.accent} />
